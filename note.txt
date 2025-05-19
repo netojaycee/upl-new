@@ -1,0 +1,3 @@
+add queries for add team and players to team to league, edit adnd delte leagues and then matches idea
+
+ensure we use players and team card through the app with props

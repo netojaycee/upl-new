@@ -59,7 +59,7 @@ export function ManageTeamsModal({
               No teams available
             </p>
           ) : (
-            <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4'>
+            <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2'>
               {teams.map((team) => (
                 <TeamCard
                   key={team.id}

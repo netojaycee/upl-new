@@ -25,11 +25,11 @@ export function Modal({
 }: ModalProps) {
   return (
     <Dialog open={isOpen}  onOpenChange={onClose}>
-      <DialogContent   className={`p-4 overflow-y-auto ${className} `}>
+      <DialogContent   className={`p-4 overflow-y-auto ${className}`}>
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="fixed top-0">
             {title && (
-              <div className='mb-2'>
+              <div className='mb-4'>
                 <h2 className='text-2xl font-bold'>{title}</h2>
               </div>
             )}
