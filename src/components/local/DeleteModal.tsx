@@ -21,7 +21,7 @@ interface DeleteModalProps {
   itemName?: string | null;
   className?: string;
   onSuccess?: () => void;
-  type: "team" | "player";
+  type: "team" | "player" | "league";
 }
 
 export function DeleteModal({
@@ -39,14 +39,14 @@ export function DeleteModal({
   const [open, setOpen] = useState(false);
 
   const mutation = type === "team" ? deleteTeamMutation : deletePlayerMutation;
-  const itemType = type === "team" ? "team" : "player";
-
+  const itemType =
+    type === "team" ? "team" : type === "player" ? "player" : type === "league" ? "league" : null;
   const handleDelete = async () => {
     if (itemId) {
       mutation.mutate(itemId, {
         onSuccess: () => {
           toast.success(`${itemType} Deleted`, {
-            description: `Your ${itemType.toLowerCase()} has been deleted successfully!`,
+            description: `Your ${itemType && itemType.toLowerCase()} has been deleted successfully!`,
           });
           onSuccess?.();
           onClose();
@@ -62,8 +62,9 @@ export function DeleteModal({
 
   return (
     <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger>
-        <Trash className='w-4 h-4 text-red-500' />
+      <DialogTrigger className='flex items-center space-x-4'>
+        <Trash className='w-4 h-4 text-red-500' />{" "}
+        {type === "league" && <p className=''>Delete League</p>}
       </DialogTrigger>
       <DialogContent className={`sm:max-w-[425px] ${className}`}>
         <DialogHeader>
@@ -74,7 +75,7 @@ export function DeleteModal({
           </DialogTitle>
         </DialogHeader>
         <p>
-          Are you sure you want to delete {itemName || itemType.toLowerCase()}?
+          Are you sure you want to delete {itemName || itemType?.toLowerCase()}?
         </p>
         <DialogFooter>
           <Button variant='outline' onClick={() => setOpen(false)}>

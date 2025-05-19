@@ -9,7 +9,7 @@ import {
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth"; // Add this import
 import { auth, db } from "./firebase"; // Import auth from firebase.ts
 import { User } from "firebase/auth";
-import { LoginCredentials, NewPlayer, NewTeam, Player, Team } from "./types";
+import { League, LoginCredentials, NewLeague, NewPlayer, NewTeam, Player, Team } from "./types";
 import useAuthStore from "./store";
 import {
     collection,
@@ -452,5 +452,160 @@ export const usePlayers = (): UseQueryResult<Player[], Error> => {
             );
         },
         enabled: !!user,
+    });
+};
+
+export const useLeagues = (): UseQueryResult<League[], Error> => {
+    const { user } = useAuthStore();
+
+    return useQuery<League[], Error>({
+        queryKey: ["leagues"],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+            const collRef: CollectionReference<DocumentData> = collection(db, "leagues");
+            const q = query(collRef);
+            const snapshot = await getDocs(q);
+
+            const leagues = snapshot.docs.map(
+                (doc) => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    competition: capitalizeWords(doc.data().competition),
+                } as League)
+            );
+
+            // Sort leagues case-insensitively by competition
+            // return leagues.sort((a, b) =>
+            //     a.competition.localeCompare(b.competition, undefined, { sensitivity: "base" })
+            // );
+            return leagues.sort((a, b) => Number(b.number) - Number(a.number));
+        },
+        enabled: !!user,
+        refetchOnWindowFocus: false,
+    });
+};
+
+export const useLeague = (leagueId: string): UseQueryResult<League, Error> => {
+    const { user } = useAuthStore();
+
+    return useQuery<League, Error>({
+        queryKey: ["leagues", leagueId],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+            const leagueRef = doc(db, "leagues", leagueId);
+            const docSnap = await getDoc(leagueRef);
+
+            if (!docSnap.exists()) {
+                throw new Error("League not found");
+            }
+
+            const leagueData = docSnap.data();
+
+
+            return {
+                id: docSnap.id,
+                ...leagueData,
+                competition: capitalizeWords(leagueData.competition),
+            } as League;
+        },
+        enabled: !!user && !!leagueId,
+        refetchOnWindowFocus: false,
+    });
+};
+
+export const useAddLeague = (): UseMutationResult<League, Error, NewLeague, unknown> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+
+    return useMutation({
+        mutationFn: async (newLeague: NewLeague) => {
+            if (!user) throw new Error("User not authenticated");
+            const collRef: CollectionReference<DocumentData> = collection(db, "leagues");
+            const q = query(collRef);
+            const snapshot = await getDocs(q);
+            const highestNumber = snapshot.empty
+                ? 0
+                : Math.max(...snapshot.docs.map((doc) => doc.data().number));
+            const newNumber = highestNumber + 1;
+            // const formattedCompetition = capitalizeWords(newLeague.competition);
+            // const generatedId = `${formattedCompetition} (${newLeague.year}) Season`;
+
+            const leagueData = {
+                competition: newLeague.competition,
+                hasFinished: newLeague.hasFinished,
+                number: newNumber.toString(),
+                year: newLeague.year,
+                id: newLeague.id,
+            };
+
+
+
+            await addDoc(collRef, leagueData);
+            return leagueData as League;
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["leagues"] });
+        },
+    });
+};
+
+export const useUpdateLeague = (): UseMutationResult<League, Error, { number: string } & NewLeague, unknown> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+
+    return useMutation({
+        mutationFn: async (updatedLeague: { number: string } & NewLeague) => {
+            if (!user) throw new Error("User not authenticated");
+            const leagueRef = doc(db, "leagues", updatedLeague.id);
+            const docSnap = await getDoc(leagueRef);
+
+            if (!docSnap.exists()) {
+                throw new Error("League not found");
+            }
+
+
+            // const formattedCompetition = capitalizeWords(updatedLeague.competition);
+            // const generatedId = `${formattedCompetition} (${updatedLeague.year}) Season`;
+
+            const leagueData = {
+                // competition: updatedLeague.competition,
+                hasFinished: updatedLeague.hasFinished,
+                // number: updatedLeague.number,
+                // year: updatedLeague.year,
+                // uid: user.uid,
+                // id: updatedLeague.id,
+            };
+
+            await updateDoc(leagueRef, leagueData);
+            return { number: updatedLeague.number.toString(), ...leagueData } as League;
+                },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["leagues"] });
+        },
+    });
+};
+
+export const useDeleteLeague = (): UseMutationResult<void, Error, string, unknown> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (leagueId: string) => {
+            if (!user) throw new Error("User not authenticated");
+            const leagueRef = doc(db, "leagues", leagueId);
+            const docSnap = await getDoc(leagueRef);
+
+            if (!docSnap.exists()) {
+                throw new Error("League not found");
+            }
+
+
+            await deleteDoc(leagueRef);
+        },
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ["leagues"] });
+        },
     });
 };

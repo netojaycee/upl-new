@@ -24,8 +24,8 @@ export function Modal({
   className,
 }: ModalProps) {
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`sm:max-w-[425px] ${className} h-[90vh] overflow-y-auto`}>
+    <Dialog open={isOpen}  onOpenChange={onClose}>
+      <DialogContent   className={`p-4 overflow-y-auto ${className} `}>
         <DialogHeader>
           <DialogTitle>
             {title && (
