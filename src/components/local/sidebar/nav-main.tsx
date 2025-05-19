@@ -1,6 +1,5 @@
 "use client";
 
-
 // import { Button } from "@/components/ui/button"
 import {
   SidebarGroup,
@@ -53,7 +52,7 @@ export function NavMain({
               <SidebarMenuButton
                 tooltip={item.title}
                 asChild
-                isActive={pathname === item.url}
+                isActive={pathname === item.url || pathname.includes(item.url)}
               >
                 <a href={item.url}>
                   {item.icon && <item.icon />}
