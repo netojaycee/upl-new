@@ -67,7 +67,7 @@ export default function TeamsPage() {
               key={team.id}
               className='border rounded-lg p-4 flex flex-col items-center'
             >
-              <Link href={`/teams/${team.id}/players`}>
+              <Link href={`/teams/${team.id}`}>
                 <Image
                   width={200}
                   height={200}
