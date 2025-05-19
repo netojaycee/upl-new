@@ -26,6 +26,7 @@ import {
     orderBy,
 } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { capitalizeWords } from "./utils";
 
 
 // New login hook
@@ -96,7 +97,7 @@ export const useAddTeam = (): UseMutationResult<Team, Error, NewTeam, unknown> =
             }
 
             const teamData = {
-                name: newTeam.name,
+                name: capitalizeWords(newTeam.name),
                 phoneNumber: newTeam.phoneNumber,
                 imageUrl,
                 createdAt: newTeam.createdAt,
@@ -134,7 +135,7 @@ export const useUpdateTeam = (): UseMutationResult<
             }
 
             const teamData = {
-                name: updatedTeam.name,
+                name: capitalizeWords(updatedTeam.name),
                 phoneNumber: updatedTeam.phoneNumber,
                 imageUrl,
                 createdAt: updatedTeam.createdAt,
@@ -255,7 +256,7 @@ export const useAddPlayer = (): UseMutationResult<Player, Error, NewPlayer, unkn
             }
 
             const playerData = {
-                name: newPlayer.name,
+                name: capitalizeWords(newPlayer.name),
                 phoneNumber: newPlayer.phoneNumber,
                 dateOfBirth: newPlayer.dateOfBirth,
                 teamId: newPlayer.teamId,
@@ -352,7 +353,7 @@ export const useUpdatePlayer = (): UseMutationResult<
             }
 
             const playerData = {
-                name: updatedPlayer.name,
+                name: capitalizeWords(updatedPlayer.name),
                 phoneNumber: updatedPlayer.phoneNumber,
                 dateOfBirth: updatedPlayer.dateOfBirth,
                 teamId: updatedPlayer.teamId,
