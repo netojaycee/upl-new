@@ -4,16 +4,11 @@ import { useState, ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { TeamForm } from "@/components/local/forms/TeamForm";
 import { Modal } from "@/components/local/Modal";
-import { Plus, Pencil, Loader2, Circle } from "lucide-react";
-// import { SectionCards } from "@/components/sidebar/section-cards";
-import Image from "next/image";
+import { Plus, Loader2, Circle } from "lucide-react";
 import { TeamsResult, useTeams } from "@/lib/firebaseQueries";
 import { Input } from "@/components/ui/input";
-import { DeleteModal } from "@/components/local/DeleteModal";
-import Link from "next/link";
 import { Team } from "@/lib/types";
-
-
+import { TeamCard } from "@/components/local/TeamCard";
 
 export default function TeamsPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -60,45 +55,17 @@ export default function TeamsPage() {
           <Plus className='w-4 h-4' /> Add Team
         </Button>
       </div>
+
       <div className='mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4'>
         {teams &&
           filteredTeams.map((team) => (
-            <div
+            <TeamCard
               key={team.id}
-              className='border rounded-lg p-4 flex flex-col items-center'
-            >
-              <Link href={`/teams/${team.id}`}>
-                <Image
-                  width={200}
-                  height={200}
-                  src={team.imageUrl ?? "/logotest.jpg"}
-                  alt={team.name}
-                  className='w-24 h-24 object-cover rounded-full mb-2'
-                />
-              </Link>
-              <div className='flex justify-between items-center w-full'>
-                <span className='text-lg font-medium'>{team.name}</span>
-                <div className='flex gap-2'>
-                  <button
-                    onClick={() => setEditTeamId(team.id)}
-                    className='text-blue-500 hover:text-blue-700'
-                  >
-                    <Pencil className='w-4 h-4' />
-                  </button>
-
-                  <DeleteModal
-                    //   isOpen={isDeleteModalOpen}
-                    // onClose={() => setIsDeleteModalOpen(false)}
-                    onClose={() => {}}
-                    itemId={team.id}
-                    itemName={team?.name}
-                    // onSuccess={() => setIsDeleteModalOpen(false)}
-                    onSuccess={() => {}}
-                    type='team'
-                  />
-                </div>
-              </div>
-            </div>
+              team={team}
+              onView={() => (window.location.href = `/teams/${team.id}`)}
+              onEdit={() => setEditTeamId(team.id)}
+              onDelete={() => {}}
+            />
           ))}
       </div>
       <Modal

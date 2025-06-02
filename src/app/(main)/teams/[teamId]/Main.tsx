@@ -2,16 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGetTeam, usePlayersByTeam, useTeams } from "@/lib/firebaseQueries";
-import { Loader2, Pencil, Plus } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
-import { DeleteModal } from "@/components/local/DeleteModal";
 import { useState } from "react";
 import { PlayerForm } from "@/components/local/forms/PlayerForm";
 import { Modal } from "@/components/local/Modal";
 import { Player } from "@/lib/types";
+import { PlayerCard } from "@/components/local/PlayerCard";
 
 export default function TeamDetailsPage({ teamId }: { teamId: string }) {
   const {
@@ -57,23 +56,32 @@ export default function TeamDetailsPage({ teamId }: { teamId: string }) {
       <Button variant='outline' onClick={() => router.back()} className='mb-6'>
         Back
       </Button>
-      <Card>
-        <CardHeader>
-          <CardTitle className='text-2xl'>{team.name}</CardTitle>
+      <Card className='mb-8 max-w-md mx-auto shadow-lg border border-border bg-background'>
+        <CardHeader className='flex flex-col items-center'>
+          <div className='flex flex-col items-center w-full'>
+            <div className='flex justify-center w-full mb-2'>
+              <Image
+                src={team.imageUrl ?? "/logotest.jpg"}
+                alt={`${team.name} logo`}
+                width={120}
+                height={120}
+                className='rounded-full border-4 border-primary shadow-md bg-background object-cover w-32 h-32'
+                style={{ display: "block" }}
+              />
+            </div>
+            <CardTitle className='text-2xl font-bold text-center mt-2 mb-1 w-full'>
+              {team.name}
+            </CardTitle>
+            <div className='flex flex-col items-center w-full'>
+              <span className='text-sm text-muted-foreground mb-1'>
+                Phone: {team.phoneNumber || "N/A"}
+              </span>
+              <span className='text-sm text-muted-foreground mb-1'>
+                Created: {new Date(team.createdAt).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
-          {team.imageUrl && (
-            <Image
-              src={team.imageUrl}
-              alt={`${team.name} logo`}
-              width={100}
-              height={100}
-              className='rounded-full mb-4'
-            />
-          )}
-          <p>Phone: {team.phoneNumber}</p>
-          <p>Created: {new Date(team.createdAt).toLocaleDateString()}</p>
-        </CardContent>
       </Card>
       <div className='flex items-center justify-between mt-4 mb-8'>
         <h2 className='text-xl font-bold mt-8 mb-4'>Players</h2>
@@ -86,42 +94,14 @@ export default function TeamDetailsPage({ teamId }: { teamId: string }) {
       ) : (
         <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
           {players?.map((player) => (
-            <Card key={player.id}>
-              <CardHeader>
-                <CardTitle className='text-lg'>{player.name}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {player.imageUrl && (
-                  <Image
-                    src={player.imageUrl}
-                    alt={`${player.name} image`}
-                    width={80}
-                    height={80}
-                    className='rounded-full mb-4'
-                  />
-                )}
-                <p>DOB: {new Date(player.dateOfBirth).toLocaleDateString()}</p>
-                <p>Phone: {player.phoneNumber || "N/A"}</p>
-                <Button asChild variant='outline' size='sm' className='mt-4'>
-                  <Link href={`/players/${player.id}`}>View Details</Link>
-                </Button>
-                <div className='flex gap-2 mt-4'>
-                  <button
-                    onClick={() => setEditPlayer(player)}
-                    className='text-blue-500 hover:text-blue-700'
-                  >
-                    <Pencil className='w-4 h-4' />
-                  </button>
-                  <DeleteModal
-                    onClose={() => {}}
-                    itemId={player?.id}
-                    itemName={player?.name}
-                    onSuccess={() => {}}
-                    type='player'
-                  />
-                </div>
-              </CardContent>
-            </Card>
+            <PlayerCard
+              key={player.id}
+              player={player}
+              showDetails
+              onView={() => router.push(`/players/${player.id}`)}
+              onEdit={() => setEditPlayer(player)}
+              onDelete={() => {}}
+            />
           ))}
         </div>
       )}

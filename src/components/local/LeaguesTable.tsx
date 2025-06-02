@@ -10,22 +10,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { LeagueActions } from "./LeagueActions";
+import { useRouter } from "next/navigation";
 
 interface LeaguesTableProps {
   leagues: League[];
   onEdit: (league: League) => void;
-  onManageTeams: (league: League) => void;
-  onManagePlayers: (league: League) => void;
-  onManageMatches: (league: League) => void;
 }
 
 export function LeaguesTable({
   leagues,
   onEdit,
-  onManageTeams,
-  onManagePlayers,
-  onManageMatches,
 }: LeaguesTableProps) {
+  const router = useRouter();
+  const handleRowClick = (league: League) => {
+    router.push(`/leagues/${league.id}`);
+  };
   return (
     <Table>
       <TableHeader>
@@ -44,17 +43,24 @@ export function LeaguesTable({
           </TableRow>
         ) : (
           leagues.map((league) => (
-            <TableRow key={league.number}>
+            <TableRow
+              onClick={() => handleRowClick(league)}
+              key={league.id}
+              className='cursor-pointer'
+            >
               <TableCell>{league.competition}</TableCell>
               <TableCell>{league.year}</TableCell>
               <TableCell className='text-right'>
-                <LeagueActions
-                  league={league}
-                  onEdit={() => onEdit(league)}
-                  onManageTeams={() => onManageTeams(league)}
-                  onManagePlayers={() => onManagePlayers(league)}
-                  onManageMatches={() => onManageMatches(league)}
-                />
+                <div
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                >
+                  <LeagueActions
+                    league={league}
+                    onEdit={() => onEdit(league)}
+                  />
+                </div>
               </TableCell>
             </TableRow>
           ))

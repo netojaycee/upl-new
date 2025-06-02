@@ -149,19 +149,11 @@ import { useLeagues } from "@/lib/firebaseQueries";
 import { Circle, Loader2, Plus } from "lucide-react";
 import { LeaguesTable } from "@/components/local/LeaguesTable";
 import { LeagueForm } from "@/components/local/forms/LeagueForm";
-import { ManageTeamsModal } from "@/components/local/ManageTeamsModal";
-import { ManagePlayersDrawer } from "@/components/local/ManagePlayersDrawer";
 import { Modal } from "@/components/local/Modal";
 
 export default function LeaguesPage() {
   const [isAddLeagueModalOpen, setIsAddLeagueModalOpen] = useState(false);
   const [editLeague, setEditLeague] = useState<League | null>(null);
-  const [manageTeamsLeague, setManageTeamsLeague] = useState<League | null>(
-    null
-  );
-  const [managePlayersLeague, setManagePlayersLeague] = useState<League | null>(
-    null
-  );
   const { data: leagues = [], isLoading, error } = useLeagues();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -175,9 +167,7 @@ export default function LeaguesPage() {
       )
     : [];
 
-  const handleManageMatches = (league: League) => {
-    console.log("Manage matches for league:", league.competition);
-  };
+
 
   if (isLoading) {
     return (
@@ -211,9 +201,6 @@ export default function LeaguesPage() {
       <LeaguesTable
         leagues={filteredLeagues}
         onEdit={setEditLeague}
-        onManageTeams={setManageTeamsLeague}
-        onManagePlayers={setManagePlayersLeague}
-        onManageMatches={handleManageMatches}
       />
       <Modal
         isOpen={isAddLeagueModalOpen}
@@ -229,20 +216,7 @@ export default function LeaguesPage() {
       >
         <LeagueForm league={editLeague} onSuccess={() => setEditLeague(null)} />
       </Modal>
-      {manageTeamsLeague && (
-        <ManageTeamsModal
-          isOpen={!!manageTeamsLeague}
-          onClose={() => setManageTeamsLeague(null)}
-          league={manageTeamsLeague}
-        />
-      )}
-      {managePlayersLeague && (
-        <ManagePlayersDrawer
-          isOpen={!!managePlayersLeague}
-          onClose={() => setManagePlayersLeague(null)}
-          league={managePlayersLeague}
-        />
-      )}
+      
     </div>
   );
 }

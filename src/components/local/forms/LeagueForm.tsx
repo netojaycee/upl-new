@@ -14,23 +14,34 @@ import { toast } from "sonner";
 import { capitalizeWords } from "@/lib/utils";
 import { NewLeague, League } from "@/lib/types";
 
-const leagueSchema = z.object({
-  competition: z
-    .string()
-    .min(1, "Competition name is required")
-    .max(100, "Competition name must be 100 characters or less"),
-  hasFinished: z.boolean(),
-  startYear: z
-    .number()
-    .int()
-    .min(1900, "Year must be at least 1900")
-    .max(new Date().getFullYear() + 1, "Year cannot be in the future"),
-  endYear: z
-    .number()
-    .int()
-    .min(1900, "Year must be at least 1900")
-    .max(new Date().getFullYear() + 1, "Year cannot be in the future"),
-});
+const leagueSchema = z
+  .object({
+    competition: z
+      .string()
+      .min(1, "Competition name is required")
+      .max(100, "Competition name must be 100 characters or less"),
+    hasFinished: z.boolean(),
+    startYear: z
+      .number()
+      .int()
+      .min(1900, "Year must be at least 1900"),
+      // .max(new Date().getFullYear() + 1, "Year cannot be in the future"),
+    endYear: z
+      .number()
+      .int()
+      .min(1900, "Year must be at least 1900"),
+      // .max(new Date().getFullYear() + 1, "Year cannot be in the future"),
+  })
+  .refine(
+    (data) =>
+      data.startYear === data.endYear ||
+      Math.abs(data.startYear - data.endYear) === 1,
+    {
+      message:
+        "Start and end year can be the same or differ by 1 only (e.g., 2023 or 2023/2024)",
+      path: ["endYear"],
+    }
+  );
 
 type LeagueFormValues = z.infer<typeof leagueSchema>;
 
@@ -81,72 +92,79 @@ export function LeagueForm({ className, league, onSuccess }: LeagueFormProps) {
     }
   }, [league, isEditMode, reset]);
 
-const onSubmit = async (data: LeagueFormValues) => {
+  const onSubmit = async (data: LeagueFormValues) => {
     try {
-        const formattedCompetition = capitalizeWords(data.competition);
-            const year = data.startYear === data.endYear
-                ? `${data.startYear}`
-                : `${data.startYear}/${data.endYear}`;
-            const generatedDisplayId = `${formattedCompetition} (${year}) Season`;
+      const formattedCompetition = capitalizeWords(data.competition);
+      const year =
+        data.startYear === data.endYear
+          ? `${data.startYear}`
+          : `${data.startYear}/${data.endYear}`;
+      const year_for_league_name =
+        data.startYear === data.endYear
+          ? `${data.startYear}`
+          : `${data.startYear}_${data.endYear}`;
+      const generatedDisplayId = `${formattedCompetition} (${year_for_league_name}) Season`;
 
-        if (isEditMode && league) {
-            // Edit: use League type
-            const leagueData: League = {
-                ...league,
-                competition: formattedCompetition,
-                hasFinished: data.hasFinished,
-                year,
-            };
+      if (isEditMode && league) {
+        // Edit: use League type
+        const leagueData: League = {
+          ...league,
+          competition: formattedCompetition,
+          hasFinished: data.hasFinished,
+          year,
+        };
 
-            updateLeagueMutation.mutate(leagueData, {
-                onSuccess: () => {
-                    toast.success("League Updated", {
-                        description: "Your league has been updated successfully!",
-                    });
-                    onSuccess?.();
-                },
-                onError: (error) => {
-                    toast.error("Error", {
-                        description: error.message,
-                    });
-                },
+        updateLeagueMutation.mutate(leagueData, {
+          onSuccess: () => {
+            toast.success("League Updated", {
+              description: "Your league has been updated successfully!",
             });
-        } else {
-            // Add: use NewLeague type
-            const newLeagueData: NewLeague = {
-              competition: formattedCompetition,
-              hasFinished: data.hasFinished,
-              year,
-              id: generatedDisplayId,
-            };
-
-            addLeagueMutation.mutate(newLeagueData, {
-                onSuccess: () => {
-                    toast.success("League Added", {
-                        description: "Your league has been created successfully!",
-                    });
-                    reset({
-                        competition: "",
-                        hasFinished: true,
-                        startYear: new Date().getFullYear(),
-                        endYear: new Date().getFullYear(),
-                    });
-                    setIsSwitchOn(true);
-                    onSuccess?.();
-                },
-                onError: (error) => {
-                    toast.error("Error", {
-                        description: error.message,
-                    });
-                },
+            onSuccess?.();
+          },
+          onError: (error: any) => {
+            toast.error("Error", {
+              description: error.message,
             });
-        }
-    } catch {
-        toast.error("Error", {
-            description: "Failed to process the form.",
+            console.log(`Error updating league: ${error.message}`);
+          },
         });
+      } else {
+        // Add: use NewLeague type
+        const newLeagueData: NewLeague = {
+          competition: formattedCompetition,
+          hasFinished: data.hasFinished,
+          year,
+          id: generatedDisplayId,
+        };
+
+        addLeagueMutation.mutate(newLeagueData, {
+          onSuccess: () => {
+            toast.success("League Added", {
+              description: "Your league has been created successfully!",
+            });
+            reset({
+              competition: "",
+              hasFinished: true,
+              startYear: new Date().getFullYear(),
+              endYear: new Date().getFullYear(),
+            });
+            setIsSwitchOn(true);
+            onSuccess?.();
+          },
+          onError: (error: any) => {
+            toast.error("Error", {
+              description: error.message,
+            });
+            console.log(`Error adding league: ${error.message}`);
+          },
+        });
+      }
+    } catch {
+      toast.error("Error", {
+        description: "Failed to process the form.",
+      });
     }
-};
+  };
 
   return (
     <div className={cn("flex flex-col gap-6", className)}>
@@ -159,25 +177,29 @@ const onSubmit = async (data: LeagueFormValues) => {
             type='text'
             placeholder='Enter competition name'
             {...register("competition")}
+            value={"Unity Premier League"}
+            readOnly
           />
           {errors.competition && (
             <p className='text-red-500 text-sm'>{errors.competition.message}</p>
           )}
         </div>
-        <div className='grid gap-2'>
-          <Label htmlFor='hasFinished'>Has Finished</Label>
-          <input
-            type='checkbox'
-            id='hasFinished'
-            {...register("hasFinished")}
-            className='h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary'
-            onChange={(e) => {
-              setValue("hasFinished", e.target.checked);
-              setIsSwitchOn(e.target.checked);
-            }}
-            checked={isSwitchOn}
-          />
-        </div>
+        {isEditMode && (
+          <div className='grid gap-2'>
+            <Label htmlFor='hasFinished'>Has Finished</Label>
+            <input
+              type='checkbox'
+              id='hasFinished'
+              {...register("hasFinished")}
+              className='h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary'
+              onChange={(e) => {
+                setValue("hasFinished", e.target.checked);
+                setIsSwitchOn(e.target.checked);
+              }}
+              checked={isSwitchOn}
+            />
+          </div>
+        )}
         <div className='grid gap-2'>
           <Label htmlFor='startYear'>Start Year</Label>
           <Input

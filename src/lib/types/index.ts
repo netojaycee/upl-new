@@ -4,6 +4,18 @@ export interface Team {
     imageUrl: string | null;
     phoneNumber?: string;
     createdAt: string;
+    currentManager?: string | null;
+    address?: string | null;
+    played?: number;
+    wins?: number;
+    draws?: number;
+    losses?: number;
+    gf?: number;
+    ga?: number;
+    gd?: number;
+    points?: number;
+    position?: number;
+    yearEstablished?: string | null;
 }
 
 
@@ -43,8 +55,19 @@ export interface Player {
     dateOfBirth: string;
     imageUrl: string | null;
     createdAt: string;
-    teamId?: string;
-    teamName?: string;
+    appearances: number;
+    assists: number;
+    currentLeague: string; // e.g., "Unity Premier League (2021) Season"
+    goals: number;
+    leagueId: string; // e.g., "041WqzXXlILIPEmB4Nu1"
+    licenseNo: string | null; // e.g., "123456789"
+    reds: number;
+    teamId: string; // e.g., "Ace6J6tGi8IB90KL8VAx"
+    teamName: string; // e.g., "Star Rovers FC"
+    yellows: number;
+
+
+
 }
 
 export interface NewPlayer {

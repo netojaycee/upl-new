@@ -26,7 +26,7 @@ import {
     orderBy,
     setDoc,
 } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { capitalizeWords } from "./utils";
 
 
@@ -206,23 +206,11 @@ export const useTeams = (): UseQueryResult<TeamsResult, Error> => {
 export const useDeleteTeam = (): UseMutationResult<void, Error, string, unknown> => {
     const { user } = useAuthStore();
     const queryClient = useQueryClient();
-    const storage = getStorage();
 
     return useMutation({
         mutationFn: async (teamId: string) => {
             if (!user) throw new Error("User not authenticated");
             const teamRef = doc(db, `teams`, teamId);
-            const docSnap = await getDoc(teamRef);
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                if (data.imageUrl) {
-                    // Try to delete the image from storage
-                    try {
-                        const imageRef = ref(storage, `teamLogos/${teamId}.jpg`);
-                        await deleteObject(imageRef);
-                    } catch { /* ignore if not found */ }
-                }
-            }
             await deleteDoc(teamRef);
         },
         onSuccess: () => {
@@ -231,81 +219,7 @@ export const useDeleteTeam = (): UseMutationResult<void, Error, string, unknown>
     });
 };
 
-export const usePlayers = (): UseQueryResult<Player[], Error> => {
-    const { user } = useAuthStore();
 
-    return useQuery<Player[], Error>({
-        queryKey: ["players", user?.uid],
-        queryFn: async () => {
-            if (!user) throw new Error("User not authenticated");
-            const collRef: CollectionReference<DocumentData> = collection(
-                db,
-                `players`
-            );
-
-            // Create query with orderBy for alphabetical sorting by name
-            const q = query(collRef, orderBy("name", "asc"));
-            const snapshot = await getDocs(q);
-
-            return snapshot.docs.map(
-                (doc) =>
-                ({
-                    id: doc.id,
-                    ...doc.data(),
-                } as Player)
-            );
-        },
-        enabled: !!user,
-    });
-};
-
-export const usePlayersByTeam = (teamId: string | null): UseQueryResult<Player[], Error> => {
-    return useQuery<Player[], Error>({
-        queryKey: ["players", "team"],
-        queryFn: async () => {
-            if (!teamId) throw new Error("Team ID is required");
-            const collRef: CollectionReference<DocumentData> = collection(db, `players`);
-            const q = query(collRef, where("teamId", "==", teamId), orderBy("name", "asc"));
-            const snapshot = await getDocs(q);
-            return snapshot.docs.map(
-                (doc) =>
-                ({
-                    id: doc.id,
-                    ...doc.data(),
-                } as Player)
-            );
-        },
-        enabled: !!teamId,
-    });
-};
-
-export const useDeletePlayer = (): UseMutationResult<void, Error, string, unknown> => {
-    const { user } = useAuthStore();
-    const queryClient = useQueryClient();
-    const storage = getStorage();
-
-    return useMutation({
-        mutationFn: async (playerId: string) => {
-            if (!user) throw new Error("User not authenticated");
-            const playerRef = doc(db, `players`, playerId);
-            const docSnap = await getDoc(playerRef);
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                if (data.imageUrl) {
-                    // Try to delete the image from storage
-                    try {
-                        const imageRef = ref(storage, `playerImages/${playerId}.jpg`);
-                        await deleteObject(imageRef);
-                    } catch { /* ignore if not found */ }
-                }
-            }
-            await deleteDoc(playerRef);
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["players", user?.uid] });
-        },
-    });
-};
 
 export const useAddPlayer = (): UseMutationResult<Player, Error, NewPlayer, unknown> => {
     const { user } = useAuthStore();
@@ -475,6 +389,71 @@ export const useGetPlayer = (playerId: string | null): UseQueryResult<Player, Er
     });
 };
 
+export const useDeletePlayer = (): UseMutationResult<void, Error, string, unknown> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (playerId: string) => {
+            if (!user) throw new Error("User not authenticated");
+            const playerRef = doc(db, `players`, playerId);
+            await deleteDoc(playerRef);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["players", user?.uid] });
+        },
+    });
+};
+
+export const usePlayersByTeam = (teamId: string | null): UseQueryResult<Player[], Error> => {
+    return useQuery<Player[], Error>({
+        queryKey: ["players", "team"],
+        queryFn: async () => {
+            if (!teamId) throw new Error("Team ID is required");
+            const collRef: CollectionReference<DocumentData> = collection(db, `players`);
+            const q = query(collRef, where("teamId", "==", teamId), orderBy("name", "asc"));
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(
+                (doc) =>
+                ({
+                    id: doc.id,
+                    ...doc.data(),
+                } as Player)
+            );
+        },
+        enabled: !!teamId,
+    });
+};
+
+
+export const usePlayers = (): UseQueryResult<Player[], Error> => {
+    const { user } = useAuthStore();
+
+    return useQuery<Player[], Error>({
+        queryKey: ["players", user?.uid],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+            const collRef: CollectionReference<DocumentData> = collection(
+                db,
+                `players`
+            );
+
+            // Create query with orderBy for alphabetical sorting by name
+            const q = query(collRef, orderBy("name", "asc"));
+            const snapshot = await getDocs(q);
+
+            return snapshot.docs.map(
+                (doc) =>
+                ({
+                    id: doc.id,
+                    ...doc.data(),
+                } as Player)
+            );
+        },
+        enabled: !!user,
+    });
+};
+
 export const useLeagues = (): UseQueryResult<League[], Error> => {
     const { user } = useAuthStore();
 
@@ -587,10 +566,16 @@ export const useUpdateLeague = (): UseMutationResult<League, Error, { number: st
             }
 
 
+            // const formattedCompetition = capitalizeWords(updatedLeague.competition);
+            // const generatedId = `${formattedCompetition} (${updatedLeague.year}) Season`;
 
             const leagueData = {
+                // competition: updatedLeague.competition,
                 hasFinished: updatedLeague.hasFinished,
-
+                // number: updatedLeague.number,
+                // year: updatedLeague.year,
+                // uid: user.uid,
+                // id: updatedLeague.id,
             };
 
 
@@ -613,35 +598,14 @@ export const useDeleteLeague = (): UseMutationResult<void, Error, string, unknow
     return useMutation({
         mutationFn: async (leagueId: string) => {
             if (!user) throw new Error("User not authenticated");
-            // 1. Delete league document
             const leagueRef = doc(db, "leagues", leagueId);
             const docSnap = await getDoc(leagueRef);
+
             if (!docSnap.exists()) {
                 throw new Error("League not found");
             }
 
-            // 2. Delete all teams registered to this league in league_teams
-            const leagueTeamsQ = query(
-                collection(db, "league_teams"),
-                where("currentLeague", "==", leagueId)
-            );
-            const leagueTeamsSnap = await getDocs(leagueTeamsQ);
-            const leagueTeamDeletes = leagueTeamsSnap.docs.map(async (docSnap) => {
-                await deleteDoc(doc(db, "league_teams", docSnap.id));
-            });
 
-            // 3. Delete all players registered to this league in league_players
-            const leaguePlayersQ = query(
-                collection(db, "league_players"),
-                where("currentLeague", "==", leagueId)
-            );
-            const leaguePlayersSnap = await getDocs(leaguePlayersQ);
-            const leaguePlayerDeletes = leaguePlayersSnap.docs.map(async (docSnap) => {
-                await deleteDoc(doc(db, "league_players", docSnap.id));
-            });
-
-            // 4. Delete the league document itself
-            await Promise.all([...leagueTeamDeletes, ...leaguePlayerDeletes]);
             await deleteDoc(leagueRef);
         },
         onSuccess: async () => {
@@ -779,6 +743,7 @@ export const useAddPlayersToTeamForLeague = () => {
                     goals: player.goals || 0, // Ensure goals is always set
                     reds: player.reds || 0, // Ensure reds is always set
                     yellows: player.yellows || 0, // Ensure yellows is always set
+
                     leagueId: leaguePlayerRef.id,           // Use league's id
                     teamId,
                     teamName: player.teamName || "", // Use player's teamName
@@ -794,7 +759,26 @@ export const useAddPlayersToTeamForLeague = () => {
     });
 };
 
+// Remove a player from a team for a league
+// export const useRemovePlayerFromTeamForLeague = (): UseMutationResult<void, Error, { leagueId: string; teamId: string; playerId: string }, unknown> => {
+//     const queryClient = useQueryClient();
 
+//     return useMutation({
+//         mutationFn: async ({ leagueId, teamId, playerId }: { leagueId: string; teamId: string; playerId: string }) => {
+//             const leaguePlayerRef = doc(db, "league_players", `${leagueId}_${teamId}_${playerId}`);
+//             const docSnap = await getDoc(leaguePlayerRef);
+
+//             if (!docSnap.exists()) {
+//                 throw new Error("League player record not found");
+//             }
+
+//             await deleteDoc(leaguePlayerRef);
+//         },
+//         onSuccess: async (_, { leagueId, teamId }) => {
+//             await queryClient.invalidateQueries({ queryKey: ["leaguePlayers", leagueId, teamId] });
+//         },
+//     });
+// };
 
 export const useRemovePlayerFromTeamForLeague = (): UseMutationResult<void, Error, { leagueId: string; teamId: string; playerId: string }, unknown> => {
     const queryClient = useQueryClient();
