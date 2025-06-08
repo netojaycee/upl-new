@@ -20,12 +20,14 @@ import {
   useDeleteMatch,
   useDeleteReferee,
   useDeleteCarousel,
+  useDeleteSettings,
+  useDeleteNews,
 } from "@/lib/firebaseQueries";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface DeleteModalProps {
-  onClose: () => void;
+  onClose?: () => void;
   itemId?: string | null;
   itemName?: string | null;
   className?: string;
@@ -37,15 +39,26 @@ interface DeleteModalProps {
     | "venue"
     | "match"
     | "referee"
-    | "carousel";
+    | "carousel"
+    | "settings"
+    | "news";
   mode?: "delete" | "remove";
   leagueId?: string;
   teamId?: string;
   playerId?: string;
+  buttonVariant?:
+    | "default"
+    | "destructive"
+    | "outline"
+    | "secondary"
+    | "ghost"
+    | "link";
+  buttonSize?: "default" | "sm" | "lg" | "icon";
+  showIcon?: boolean;
 }
 
 export function DeleteModal({
-  onClose,
+  onClose = () => {},
   itemId,
   itemName,
   className,
@@ -55,6 +68,9 @@ export function DeleteModal({
   leagueId,
   teamId,
   playerId,
+  buttonVariant = "default",
+  buttonSize = "default",
+  showIcon = false,
 }: DeleteModalProps) {
   const deleteTeamMutation = useDeleteTeam();
   const deletePlayerMutation = useDeletePlayer();
@@ -63,6 +79,8 @@ export function DeleteModal({
   const deleteMatchMutation = useDeleteMatch();
   const deleteRefereeMutation = useDeleteReferee();
   const deleteCarouselMutation = useDeleteCarousel();
+  const deleteSettingsMutation = useDeleteSettings();
+  const deleteNewsMutation = useDeleteNews();
   const removeTeamFromLeagueMutation = useRemoveTeamFromLeague();
   const removePlayerFromTeamForLeagueMutation =
     useRemovePlayerFromTeamForLeague();
@@ -95,6 +113,10 @@ export function DeleteModal({
         ? deleteRefereeMutation
         : type === "carousel"
         ? deleteCarouselMutation
+        : type === "settings"
+        ? deleteSettingsMutation
+        : type === "news"
+        ? deleteNewsMutation
         : null;
   }
 
@@ -183,13 +205,36 @@ export function DeleteModal({
   };
   return (
     <Dialog onOpenChange={setOpen} open={open}>
-      <DialogTrigger className='flex items-center space-x-4'>
-        <Trash2 className='w-4 h-4 text-red-500' />{" "}
-        {type === "league" && (
-          <p className='text-red-600 focus:text-red-600'>{actionText} League</p>
-        )}
-        {type === "match" && (
-          <p className='text-red-600 focus:text-red-600'>{actionText} Match</p>
+      <DialogTrigger asChild>
+        {showIcon ? (
+          <Button variant={buttonVariant} size={buttonSize} className='gap-1'>
+            <Trash2 className='w-4 h-4' />
+            <span>{actionText}</span>
+          </Button>
+        ) : (
+          <div className='flex items-center space-x-4'>
+            <Trash2 className='w-4 h-4 text-red-500' />{" "}
+            {type === "league" && (
+              <p className='text-red-600 focus:text-red-600'>
+                {actionText} League
+              </p>
+            )}
+            {type === "match" && (
+              <p className='text-red-600 focus:text-red-600'>
+                {actionText} Match
+              </p>
+            )}
+            {type === "settings" && (
+              <p className='text-red-600 focus:text-red-600'>
+                {actionText} Settings
+              </p>
+            )}
+            {type === "news" && (
+              <p className='text-red-600 focus:text-red-600'>
+                {actionText} News
+              </p>
+            )}
+          </div>
         )}
       </DialogTrigger>
       <DialogContent className={`sm:max-w-[425px] ${className}`}>

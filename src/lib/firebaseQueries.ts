@@ -9,7 +9,7 @@ import {
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth"; // Add this import
 import { auth, db } from "./firebase"; // Import auth from firebase.ts
 import { User } from "firebase/auth";
-import { League, LoginCredentials, NewLeague, NewPlayer, NewTeam, Player, Team, Match, MatchStatus, NewMatch, BulkMatchUpload, Venue, NewVenue, Referee, NewReferee, Carousel, NewCarousel, Settings, UpdateSettings } from "./types";
+import { League, LoginCredentials, NewLeague, NewPlayer, NewTeam, Player, Team, Match, MatchStatus, NewMatch, BulkMatchUpload, Venue, NewVenue, Referee, NewReferee, Carousel, NewCarousel, Settings, News, NewNews } from "./types";
 import useAuthStore from "./store";
 import {
     collection,
@@ -872,7 +872,7 @@ export const useAddMatch = () => {
             };
 
             const matchRef = await addDoc(collection(db, "matches"), matchData);
-            
+
             return { id: matchRef.id, ...matchData } as Match;
         },
         onSuccess: (_, variables) => {
@@ -1326,41 +1326,265 @@ export const useCarousel = (carouselId: string | null): UseQueryResult<Carousel,
 // --- SETTINGS QUERIES ---
 
 
-export const useSettings = () => {
+export const useSettings = (settingId?: string) => {
     const { user } = useAuthStore();
 
     return useQuery({
-        queryKey: ["settings"],
+        queryKey: ["settings", settingId],
         queryFn: async () => {
             if (!user) throw new Error("User not authenticated");
-            const collRef: CollectionReference<DocumentData> = collection(db, "utils");
-            const snapshot = await getDocs(collRef);
+
+            if (settingId) {
+                // Fetch a specific settings document
+                const settingsRef = doc(db, "utils", settingId);
+                const docSnap = await getDoc(settingsRef);
+                if (!docSnap.exists()) throw new Error("Settings not found");
+                return { id: docSnap.id, ...docSnap.data() } as Settings;
+            } else {
+                // Fetch all settings documents
+                const collRef: CollectionReference<DocumentData> = collection(db, "utils");
+                const snapshot = await getDocs(collRef);
+                return snapshot.docs.map(
+                    (doc) => ({
+                        id: doc.id,
+                        ...doc.data(),
+                    } as Settings)
+                );
+            }
+        },
+        enabled: !!user,
+    });
+};
+
+export const useUpdateSettings = (): UseMutationResult<Settings, Error, Settings, unknown> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (updatedSettings: Settings) => {
+            if (!user) throw new Error("User not authenticated");
+            const settingsRef = doc(db, "utils", updatedSettings.id);
+
+            // Create a copy without the id field for Firestore
+            const settingsData = {
+                email: updatedSettings.email,
+                phone: updatedSettings.phone,
+                // Add any other fields here
+            };
+
+            await updateDoc(settingsRef, settingsData);
+            return updatedSettings;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["settings"] });
+        },
+    });
+};
+
+export const useDeleteSettings = (): UseMutationResult<void, Error, string, unknown> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (settingsId: string) => {
+            if (!user) throw new Error("User not authenticated");
+            const settingsRef = doc(db, "utils", settingsId);
+            await deleteDoc(settingsRef);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["settings"] });
+        },
+    });
+};
+
+// --- NEWS QUERIES ---
+
+export const useNews = () => {
+    const { user } = useAuthStore();
+
+    return useQuery({
+        queryKey: ["news"],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+            const collRef: CollectionReference<DocumentData> = collection(db, "news");
+            const q = query(collRef, orderBy("createdAt", "desc"));
+            const snapshot = await getDocs(q);
             return snapshot.docs.map(
-                (doc) =>
-                ({
+                (doc) => ({
                     id: doc.id,
                     ...doc.data(),
-                } as Settings)
+                } as News)
             );
         },
         enabled: !!user,
     });
 };
 
-export const useUpdateSettings = (): UseMutationResult<Settings, Error, UpdateSettings, unknown> => {
+export const useNewsItem = (newsId: string | null) => {
+    const { user } = useAuthStore();
+
+    return useQuery({
+        queryKey: ["news", newsId],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+            if (!newsId) throw new Error("News ID is required");
+            const newsRef = doc(db, "news", newsId);
+            const docSnap = await getDoc(newsRef);
+            if (!docSnap.exists()) throw new Error("News item not found");
+            return { id: docSnap.id, ...docSnap.data() } as News;
+        },
+        enabled: !!user && !!newsId,
+    });
+};
+
+export const useAddNews = () => {
     const { user } = useAuthStore();
     const queryClient = useQueryClient();
+    const storage = getStorage();
 
     return useMutation({
-        mutationFn: async (updatedSettings: UpdateSettings) => {
+        mutationFn: async (newNews: NewNews) => {
             if (!user) throw new Error("User not authenticated");
-            const settingsRef = doc(db, "utils");
 
-            await updateDoc(settingsRef, updatedSettings);
-            return { id: "settings", ...updatedSettings } as Settings;
+            // First, add the news document to get an ID
+            const newsData = {
+                title: newNews.title,
+                body: newNews.body,
+                imgUrl: newNews.imgUrl || '',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                uid: user.uid,
+                authorId: user.uid,
+                author: user.displayName || "Anonymous",
+                tags: newNews.tags || [],
+            };
+
+            const docRef = await addDoc(collection(db, "news"), newsData);
+
+            // If there's a file, upload it and update the document with the URL
+            if (newNews.imageFile) {
+                const storageRef = ref(storage, `news/${docRef.id}_${Date.now()}.jpg`);
+                await uploadBytes(storageRef, newNews.imageFile);
+                const imgUrl = await getDownloadURL(storageRef);
+
+                // Update the document with the image URL
+                await updateDoc(docRef, { imgUrl });
+                newsData.imgUrl = imgUrl;
+            }
+
+            return { id: docRef.id, ...newsData } as News;
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["settings"] });
+            queryClient.invalidateQueries({ queryKey: ["news"] });
+        },
+    });
+};
+
+export const useUpdateNews = () => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+    const storage = getStorage();
+
+    return useMutation({
+        mutationFn: async (updatedNews: News & { imageFile?: File }) => {
+            if (!user) throw new Error("User not authenticated");
+
+            // Check ownership
+            const newsRef = doc(db, "news", updatedNews.id);
+            const docSnap = await getDoc(newsRef);
+            if (!docSnap.exists()) throw new Error("News item not found");
+
+            const currentData = docSnap.data();
+            if (currentData.authorId !== user.uid) {
+                throw new Error("You can only edit your own news items");
+            }
+
+            // Prepare update data
+            const newsData: { 
+                title: string; 
+                body: string; 
+                updatedAt: string; 
+                tags: string[]; 
+                imgUrl?: string 
+            } = {
+                title: updatedNews.title,
+                body: updatedNews.body,
+                updatedAt: new Date().toISOString(),
+                tags: updatedNews.tags || [],
+            };
+
+            // If there's a new image file, upload it
+            if (updatedNews.imageFile) {
+                // Delete the old image if it exists
+                if (updatedNews.imgUrl) {
+                    try {
+                        const oldImageRef = ref(storage, updatedNews.imgUrl);
+                        await deleteObject(oldImageRef);
+                    } catch (error) {
+                        console.log("Error deleting old image:", error);
+                    }
+                }
+
+                // Upload new image
+                const storageRef = ref(storage, `news/${updatedNews.id}_${Date.now()}.jpg`);
+                await uploadBytes(storageRef, updatedNews.imageFile);
+                const imgUrl = await getDownloadURL(storageRef);
+                newsData.imgUrl = imgUrl;
+            }
+
+            // Update the document
+            await updateDoc(newsRef, newsData);
+
+            // Return the updated news data
+            return {
+                ...updatedNews,
+                ...newsData,
+                imgUrl: newsData.imgUrl || updatedNews.imgUrl,
+            };
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["news"] });
+            queryClient.invalidateQueries({ queryKey: ["news", data.id] });
+        },
+    });
+};
+
+export const useDeleteNews = () => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+    const storage = getStorage();
+
+    return useMutation({
+        mutationFn: async (newsId: string) => {
+            if (!user) throw new Error("User not authenticated");
+
+            // First, get the news document to check ownership and get image URL
+            const newsRef = doc(db, "news", newsId);
+            const docSnap = await getDoc(newsRef);
+
+            if (!docSnap.exists()) throw new Error("News item not found");
+
+            const newsData = docSnap.data();
+            if (newsData.authorId !== user.uid) {
+                throw new Error("You can only delete your own news items");
+            }
+
+            // Delete the image from storage if it exists
+            if (newsData.imgUrl) {
+                try {
+                    const imageRef = ref(storage, newsData.imagUrl);
+                    await deleteObject(imageRef);
+                } catch (error) {
+                    console.log("Error deleting image:", error);
+                    // Continue with deletion of the document
+                }
+            }
+
+            // Delete the news document
+            await deleteDoc(newsRef);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["news"] });
         },
     });
 };

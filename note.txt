@@ -3,3 +3,7 @@ add queries for add team and players to team to league, edit adnd delte leagues 
 ensure we use players and team card through the app with props
 
 make sure we check and match no does not duplicate
+
+create caroselg date
+work on breadcrumb fr=or every page dynamically
+fix dates in news and carusel

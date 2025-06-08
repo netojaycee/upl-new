@@ -12,7 +12,6 @@ import {
   useReferee,
 } from "@/lib/firebaseQueries";
 import { Input } from "@/components/ui/input";
-import { Referee } from "@/lib/types";
 import { RefereeCard } from "@/components/local/RefereeCard";
 import { toast } from "sonner";
 import {

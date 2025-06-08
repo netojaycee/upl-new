@@ -173,3 +173,27 @@ export interface UpdateSettings {
     email: string;
     phone: string;
 }
+
+export interface News {
+    id: string;
+    title: string;
+    body: string;
+    imgUrl: string;
+    createdAt: string;
+    updatedAt: string;
+    authorId: string;
+    author: string;
+    tags: string[];
+}
+
+export interface NewNews {
+    title: string;
+    body: string;
+    imgUrl: string;
+    createdAt: string;
+    updatedAt: string;
+    authorId: string;
+    author: string;
+    tags: string[];
+    imageFile?: File;
+}

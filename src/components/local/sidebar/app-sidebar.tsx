@@ -23,6 +23,7 @@ import {
   Settings,
   ImageIcon,
   LucideIcon,
+  Newspaper,
 } from "lucide-react";
 
 const data = {
@@ -80,6 +81,11 @@ const data = {
       title: "Referees",
       url: "/referees",
       icon: User,
+    },
+    {
+      title: "News",
+      url: "/news",
+      icon: Newspaper,
     },
     {
       title: "Carousel",
