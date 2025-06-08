@@ -80,3 +80,96 @@ export interface NewPlayer {
     teamName?: string;
 
 }
+
+export enum MatchStatus {
+    PLAYED = 'played',
+    NOT_PLAYED = 'not played',
+    LIVE = 'live',
+    HALF_TIME = 'half-time'
+}
+
+export interface Match {
+    id: string;
+    homeTeam: string;
+    homeTeamId: string;
+    homeTeamImageUrl: string;
+    homeScore: number;
+    awayTeam: string;
+    awayTeamId: string;
+    awayTeamImageUrl: string;
+    awayScore: number;
+    competition: string;
+    leagueId: string;
+    date: string | Date;
+    matchNo: number;
+    venue: string;
+    referee: string;
+    report: string | null;
+    status: MatchStatus;
+}
+
+export interface NewMatch {
+    homeTeamId: string;
+    awayTeamId: string;
+    competition: string;
+    leagueId: string;
+    date: string | Date;
+    matchNo: number;
+    venue: string;
+    referee: string;
+    status: MatchStatus;
+    homeScore?: number;
+    awayScore?: number;
+    report?: string | null;
+}
+
+export interface BulkMatchUpload {
+    matches: NewMatch[];
+    leagueId: string;
+}
+
+export interface Venue {
+    id: string;
+    name: string;
+    createdAt: string;
+}
+
+export interface NewVenue {
+    name: string;
+    createdAt: string;
+}
+
+export interface Referee {
+    id: string;
+    name: string;
+    createdAt: string;
+}
+
+export interface NewReferee {
+    name: string;
+    createdAt: string;
+}
+
+export interface Carousel {
+    id: string;
+    imgUrl: string;
+    message: string;
+    createdAt: string;
+}
+
+export interface NewCarousel {
+    imgUrl: string;
+    message: string;
+    createdAt: string;
+}
+
+export interface Settings {
+    id: string;
+    email: string;
+    phone: string;
+}
+
+export interface UpdateSettings {
+    email: string;
+    phone: string;
+}

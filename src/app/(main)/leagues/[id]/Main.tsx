@@ -6,6 +6,7 @@ import {
   useAddTeamsToLeague,
   useTeamsInLeague,
   useAllPlayersInLeague,
+  useLeagueMatches,
 } from "@/lib/firebaseQueries";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,8 @@ export default function Main({ id }: { id: string }) {
     useTeamsInLeague(decodeURIComponent(id));
   const { data: leaguePlayers = [], isLoading: isLeaguePlayersLoading } =
     useAllPlayersInLeague(decodeURIComponent(id));
+  const { data: leagueMatches = [], isLoading: isMatchesLoading } =
+    useLeagueMatches(decodeURIComponent(id));
   // const removeTeamMutation = useRemoveTeamFromLeague();
   const addTeamsMutation = useAddTeamsToLeague();
   const router = useRouter();
@@ -49,14 +52,15 @@ export default function Main({ id }: { id: string }) {
   const registeredTeamsCount = leagueTeams.length;
   const allPlayersCount = playersData?.length || 0;
   const registeredPlayersCount = leaguePlayers.length;
-  const matchesCount = 0; // Placeholder, update if you have matches data
+  const matchesCount = leagueMatches.length; // Update to get actual matches count
 
   if (
     isLoading ||
     isTeamsLoading ||
     isPlayersLoading ||
     isLeagueTeamsLoading ||
-    isLeaguePlayersLoading
+    isLeaguePlayersLoading ||
+    isMatchesLoading
   ) {
     return (
       <div className='flex justify-center py-12'>
@@ -75,9 +79,19 @@ export default function Main({ id }: { id: string }) {
 
   return (
     <div className='container mx-auto py-8'>
-      <Button variant='outline' onClick={() => router.back()} className='mb-6'>
-        Back
-      </Button>
+      <div className='flex items-center justify-between mb-6'>
+        <Button variant='outline' onClick={() => router.back()}>
+          Back
+        </Button>
+        <Button
+          onClick={() =>
+            router.push(`/leagues/${encodeURIComponent(league.id)}/matches`)
+          }
+          className='flex items-center gap-1'
+        >
+          <Trophy className='h-4 w-4 mr-1' /> Manage Matches
+        </Button>
+      </div>
       <Card className='mb-8'>
         <CardHeader>
           <CardTitle className='text-2xl font-bold'>

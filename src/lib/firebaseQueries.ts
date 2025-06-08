@@ -9,7 +9,7 @@ import {
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth"; // Add this import
 import { auth, db } from "./firebase"; // Import auth from firebase.ts
 import { User } from "firebase/auth";
-import { League, LoginCredentials, NewLeague, NewPlayer, NewTeam, Player, Team } from "./types";
+import { League, LoginCredentials, NewLeague, NewPlayer, NewTeam, Player, Team, Match, MatchStatus, NewMatch, BulkMatchUpload, Venue, NewVenue, Referee, NewReferee, Carousel, NewCarousel, Settings, UpdateSettings } from "./types";
 import useAuthStore from "./store";
 import {
     collection,
@@ -799,5 +799,568 @@ export const useAllPlayersInLeague = (leagueId: string) => {
             return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Player));
         },
         enabled: !!leagueId,
+    });
+};
+
+// --- MATCH QUERIES ---
+
+// Get all matches for a league
+export const useLeagueMatches = (leagueId: string) => {
+    return useQuery<Match[], Error>({
+        queryKey: ["matches", leagueId],
+        queryFn: async () => {
+            if (!leagueId) return [];
+            const q = query(
+                collection(db, "matches"),
+                where("leagueId", "==", leagueId),
+                orderBy("matchNo", "asc")
+            );
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Match));
+        },
+        enabled: !!leagueId,
+    });
+};
+
+// Get a single match by ID
+export const useMatch = (matchId: string) => {
+    return useQuery<Match, Error>({
+        queryKey: ["match", matchId],
+        queryFn: async () => {
+            if (!matchId) throw new Error("Match ID is required");
+            const matchRef = doc(db, "matches", matchId);
+            const docSnap = await getDoc(matchRef);
+            if (!docSnap.exists()) throw new Error("Match not found");
+            return { id: docSnap.id, ...docSnap.data() } as Match;
+        },
+        enabled: !!matchId,
+    });
+};
+
+// Add a new match
+export const useAddMatch = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (newMatch: NewMatch) => {
+            // Get home team details
+            const homeTeamRef = doc(db, "teams", newMatch.homeTeamId);
+            const homeTeamSnap = await getDoc(homeTeamRef);
+            if (!homeTeamSnap.exists()) throw new Error("Home team not found");
+
+            // Get away team details
+            const awayTeamRef = doc(db, "teams", newMatch.awayTeamId);
+            const awayTeamSnap = await getDoc(awayTeamRef);
+            if (!awayTeamSnap.exists()) throw new Error("Away team not found");
+
+            const matchData = {
+                homeTeam: homeTeamSnap.data().name,
+                homeTeamId: newMatch.homeTeamId,
+                homeTeamImageUrl: homeTeamSnap.data().imageUrl || "",
+                homeScore: newMatch.homeScore || 0,
+                awayTeam: awayTeamSnap.data().name,
+                awayTeamId: newMatch.awayTeamId,
+                awayTeamImageUrl: awayTeamSnap.data().imageUrl || "",
+                awayScore: newMatch.awayScore || 0,
+                competition: newMatch.competition,
+                leagueId: newMatch.leagueId,
+                date: newMatch.date,
+                matchNo: newMatch.matchNo,
+                venue: newMatch.venue,
+                referee: newMatch.referee || "",
+                report: newMatch.report || null,
+                status: newMatch.status || MatchStatus.NOT_PLAYED,
+            };
+
+            const matchRef = await addDoc(collection(db, "matches"), matchData);
+            
+            return { id: matchRef.id, ...matchData } as Match;
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ["matches", variables.leagueId] });
+        },
+    });
+};
+
+// Update an existing match
+export const useUpdateMatch = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (updatedMatch: Partial<Match> & { id: string }) => {
+            const { id, ...matchData } = updatedMatch;
+            const matchRef = doc(db, "matches", id);
+            const docSnap = await getDoc(matchRef);
+
+            if (!docSnap.exists()) throw new Error("Match not found");
+
+            await updateDoc(matchRef, matchData);
+            return updatedMatch as Match;
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ["matches", variables.leagueId] });
+            queryClient.invalidateQueries({ queryKey: ["match", variables.id] });
+        },
+    });
+};
+
+// Delete a match
+export const useDeleteMatch = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (id: string) => {
+            const matchRef = doc(db, "matches", id);
+            const docSnap = await getDoc(matchRef);
+
+            if (!docSnap.exists()) throw new Error("Match not found");
+
+            await deleteDoc(matchRef);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["matches"] });
+        },
+    });
+};
+
+// Bulk upload matches
+export const useBulkAddMatches = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async ({ matches, leagueId }: BulkMatchUpload) => {
+            // Process each match
+            const batch = matches.map(async (match) => {
+                // Get home team details
+                const homeTeamRef = doc(db, "teams", match.homeTeamId);
+                const homeTeamSnap = await getDoc(homeTeamRef);
+                if (!homeTeamSnap.exists()) throw new Error(`Home team not found: ${match.homeTeamId}`);
+
+                // Get away team details
+                const awayTeamRef = doc(db, "teams", match.awayTeamId);
+                const awayTeamSnap = await getDoc(awayTeamRef);
+                if (!awayTeamSnap.exists()) throw new Error(`Away team not found: ${match.awayTeamId}`);
+
+                const matchData = {
+                    homeTeam: homeTeamSnap.data().name,
+                    homeTeamId: match.homeTeamId,
+                    homeTeamImageUrl: homeTeamSnap.data().imageUrl || "",
+                    homeScore: match.homeScore || 0,
+                    awayTeam: awayTeamSnap.data().name,
+                    awayTeamId: match.awayTeamId,
+                    awayTeamImageUrl: awayTeamSnap.data().imageUrl || "",
+                    awayScore: match.awayScore || 0,
+                    competition: match.competition,
+                    leagueId,
+                    date: match.date,
+                    matchNo: match.matchNo,
+                    venue: match.venue,
+                    referee: match.referee || "",
+                    report: match.report || null,
+                    status: match.status || MatchStatus.NOT_PLAYED,
+                };
+
+                await addDoc(collection(db, "matches"), matchData);
+            });
+
+            await Promise.all(batch);
+            return { success: true, count: matches.length };
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ["matches", variables.leagueId] });
+        },
+    });
+};
+
+// --- VENUE QUERIES ---
+
+export const useVenues = (): UseQueryResult<Venue[], Error> => {
+    const { user } = useAuthStore();
+
+    return useQuery<Venue[], Error>({
+        queryKey: ["venues"],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+            const collRef: CollectionReference<DocumentData> = collection(db, "venues");
+            const q = query(collRef, orderBy("name", "asc"));
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(
+                (doc) =>
+                ({
+                    id: doc.id,
+                    ...doc.data(),
+                } as Venue)
+            );
+        },
+        enabled: !!user,
+    });
+};
+
+export const useAddVenue = (): UseMutationResult<Venue, Error, NewVenue, unknown> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (newVenue: NewVenue) => {
+            if (!user) throw new Error("User not authenticated");
+            const collRef: CollectionReference<DocumentData> = collection(db, "venues");
+
+            const venueData = {
+                name: capitalizeWords(newVenue.name),
+                createdAt: newVenue.createdAt,
+            };
+
+            const docRef = await addDoc(collRef, venueData);
+            return { id: docRef.id, ...venueData } as Venue;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["venues"] });
+        },
+    });
+};
+
+export const useUpdateVenue = (): UseMutationResult<
+    Venue,
+    Error,
+    { id: string } & NewVenue,
+    unknown
+> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (updatedVenue: { id: string } & NewVenue) => {
+            if (!user) throw new Error("User not authenticated");
+            const venueRef = doc(db, "venues", updatedVenue.id);
+
+            const venueData = {
+                name: capitalizeWords(updatedVenue.name),
+                createdAt: updatedVenue.createdAt,
+            };
+
+            await updateDoc(venueRef, venueData);
+            return { id: updatedVenue.id, ...venueData } as Venue;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["venues"] });
+        },
+    });
+};
+
+export const useDeleteVenue = (): UseMutationResult<void, Error, string, unknown> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (venueId: string) => {
+            if (!user) throw new Error("User not authenticated");
+            const venueRef = doc(db, "venues", venueId);
+            await deleteDoc(venueRef);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["venues"] });
+        },
+    });
+};
+
+export const useVenue = (venueId: string | null): UseQueryResult<Venue, Error> => {
+    const { user } = useAuthStore();
+
+    return useQuery<Venue, Error>({
+        queryKey: ["venue", venueId],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+            if (!venueId) throw new Error("Venue ID is required");
+            const venueRef = doc(db, "venues", venueId);
+            const docSnap = await getDoc(venueRef);
+            if (!docSnap.exists()) throw new Error("Venue not found");
+            return { id: docSnap.id, ...docSnap.data() } as Venue;
+        },
+        enabled: !!user && !!venueId,
+    });
+};
+
+// --- REFEREE QUERIES ---
+
+export const useReferees = (): UseQueryResult<Referee[], Error> => {
+    const { user } = useAuthStore();
+
+    return useQuery<Referee[], Error>({
+        queryKey: ["referees"],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+            const collRef: CollectionReference<DocumentData> = collection(db, "referees");
+            const q = query(collRef, orderBy("name", "asc"));
+            const snapshot = await getDocs(q);
+            return snapshot.docs.map(
+                (doc) =>
+                ({
+                    id: doc.id,
+                    ...doc.data(),
+                } as Referee)
+            );
+        },
+        enabled: !!user,
+    });
+};
+
+export const useAddReferee = (): UseMutationResult<Referee, Error, NewReferee, unknown> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (newReferee: NewReferee) => {
+            if (!user) throw new Error("User not authenticated");
+            const collRef: CollectionReference<DocumentData> = collection(db, "referees");
+
+            const refereeData = {
+                name: capitalizeWords(newReferee.name),
+                createdAt: newReferee.createdAt,
+            };
+
+            const docRef = await addDoc(collRef, refereeData);
+            return { id: docRef.id, ...refereeData } as Referee;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["referees"] });
+        },
+    });
+};
+
+export const useUpdateReferee = (): UseMutationResult<
+    Referee,
+    Error,
+    { id: string } & NewReferee,
+    unknown
+> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (updatedReferee: { id: string } & NewReferee) => {
+            if (!user) throw new Error("User not authenticated");
+            const refereeRef = doc(db, "referees", updatedReferee.id);
+
+            const refereeData = {
+                name: capitalizeWords(updatedReferee.name),
+                createdAt: updatedReferee.createdAt,
+            };
+
+            await updateDoc(refereeRef, refereeData);
+            return { id: updatedReferee.id, ...refereeData } as Referee;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["referees"] });
+        },
+    });
+};
+
+export const useDeleteReferee = (): UseMutationResult<void, Error, string, unknown> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (refereeId: string) => {
+            if (!user) throw new Error("User not authenticated");
+            const refereeRef = doc(db, "referees", refereeId);
+            await deleteDoc(refereeRef);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["referees"] });
+        },
+    });
+};
+
+export const useReferee = (refereeId: string | null): UseQueryResult<Referee, Error> => {
+    const { user } = useAuthStore();
+
+    return useQuery<Referee, Error>({
+        queryKey: ["referee", refereeId],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+            if (!refereeId) throw new Error("Referee ID is required");
+            const refereeRef = doc(db, "referees", refereeId);
+            const docSnap = await getDoc(refereeRef);
+            if (!docSnap.exists()) throw new Error("Referee not found");
+            return { id: docSnap.id, ...docSnap.data() } as Referee;
+        },
+        enabled: !!user && !!refereeId,
+    });
+};
+
+// --- CAROUSEL QUERIES ---
+
+export const useCarousels = (): UseQueryResult<Carousel[], Error> => {
+    const { user } = useAuthStore();
+
+    return useQuery<Carousel[], Error>({
+        queryKey: ["carousels"],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+            const collRef: CollectionReference<DocumentData> = collection(db, "carousel");
+            const snapshot = await getDocs(collRef);
+            return snapshot.docs.map(
+                (doc) =>
+                ({
+                    id: doc.id,
+                    ...doc.data(),
+                } as Carousel)
+            );
+        },
+        enabled: !!user,
+    });
+};
+
+export const useAddCarousel = (): UseMutationResult<Carousel, Error, NewCarousel & { imageFile?: File }, unknown> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+    const storage = getStorage();
+
+    return useMutation({
+        mutationFn: async (newCarousel: NewCarousel & { imageFile?: File }) => {
+            if (!user) throw new Error("User not authenticated");
+            const collRef: CollectionReference<DocumentData> = collection(db, "carousel");
+
+            // Generate ID early for image storage
+            const carouselId = doc(collRef).id;
+
+            let imgUrl = newCarousel.imgUrl;
+            if (newCarousel.imageFile) {
+                const storageRef = ref(storage, `carousel/${carouselId}.jpg`);
+                await uploadBytes(storageRef, newCarousel.imageFile);
+                imgUrl = await getDownloadURL(storageRef);
+            }
+
+            const carouselData = {
+                imgUrl,
+                message: newCarousel.message,
+                createdAt: newCarousel.createdAt,
+            };
+
+            await setDoc(doc(collRef, carouselId), carouselData);
+            return { id: carouselId, ...carouselData } as Carousel;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["carousels"] });
+        },
+    });
+};
+
+export const useUpdateCarousel = (): UseMutationResult<
+    Carousel,
+    Error,
+    { id: string } & NewCarousel & { imageFile?: File },
+    unknown
+> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+    const storage = getStorage();
+
+    return useMutation({
+        mutationFn: async (updatedCarousel: { id: string } & NewCarousel & { imageFile?: File }) => {
+            if (!user) throw new Error("User not authenticated");
+            const carouselRef = doc(db, "carousel", updatedCarousel.id);
+
+            let imgUrl = updatedCarousel.imgUrl;
+            if (updatedCarousel.imageFile) {
+                const storageRef = ref(storage, `carousel/${updatedCarousel.id}.jpg`);
+                await uploadBytes(storageRef, updatedCarousel.imageFile);
+                imgUrl = await getDownloadURL(storageRef);
+            }
+
+            const carouselData = {
+                imgUrl,
+                message: updatedCarousel.message,
+                createdAt: updatedCarousel.createdAt,
+            };
+
+            await updateDoc(carouselRef, carouselData);
+            return { id: updatedCarousel.id, ...carouselData } as Carousel;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["carousels"] });
+        },
+    });
+};
+
+export const useDeleteCarousel = (): UseMutationResult<void, Error, string, unknown> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+    const storage = getStorage();
+
+    return useMutation({
+        mutationFn: async (carouselId: string) => {
+            if (!user) throw new Error("User not authenticated");
+
+            // Delete image from storage
+            try {
+                const imageRef = ref(storage, `carousel/${carouselId}.jpg`);
+                await deleteObject(imageRef);
+            } catch (error) {
+                console.log("No image to delete or error:", error);
+            }
+
+            // Delete document
+            const carouselRef = doc(db, "carousel", carouselId);
+            await deleteDoc(carouselRef);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["carousels"] });
+        },
+    });
+};
+
+export const useCarousel = (carouselId: string | null): UseQueryResult<Carousel, Error> => {
+    const { user } = useAuthStore();
+
+    return useQuery<Carousel, Error>({
+        queryKey: ["carousel", carouselId],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+            if (!carouselId) throw new Error("Carousel ID is required");
+            const carouselRef = doc(db, "carousel", carouselId);
+            const docSnap = await getDoc(carouselRef);
+            if (!docSnap.exists()) throw new Error("Carousel item not found");
+            return { id: docSnap.id, ...docSnap.data() } as Carousel;
+        },
+        enabled: !!user && !!carouselId,
+    });
+};
+
+// --- SETTINGS QUERIES ---
+
+
+export const useSettings = () => {
+    const { user } = useAuthStore();
+
+    return useQuery({
+        queryKey: ["settings"],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+            const collRef: CollectionReference<DocumentData> = collection(db, "utils");
+            const snapshot = await getDocs(collRef);
+            return snapshot.docs.map(
+                (doc) =>
+                ({
+                    id: doc.id,
+                    ...doc.data(),
+                } as Settings)
+            );
+        },
+        enabled: !!user,
+    });
+};
+
+export const useUpdateSettings = (): UseMutationResult<Settings, Error, UpdateSettings, unknown> => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (updatedSettings: UpdateSettings) => {
+            if (!user) throw new Error("User not authenticated");
+            const settingsRef = doc(db, "utils");
+
+            await updateDoc(settingsRef, updatedSettings);
+            return { id: "settings", ...updatedSettings } as Settings;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["settings"] });
+        },
     });
 };

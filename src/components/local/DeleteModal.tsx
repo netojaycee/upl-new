@@ -16,8 +16,12 @@ import {
   useDeleteTeam,
   useRemoveTeamFromLeague,
   useRemovePlayerFromTeamForLeague,
+  useDeleteVenue,
+  useDeleteMatch,
+  useDeleteReferee,
+  useDeleteCarousel,
 } from "@/lib/firebaseQueries";
-import { Loader2, Trash } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface DeleteModalProps {
@@ -26,14 +30,19 @@ interface DeleteModalProps {
   itemName?: string | null;
   className?: string;
   onSuccess?: () => void;
-  type: "team" | "player" | "league";
+  type:
+    | "team"
+    | "player"
+    | "league"
+    | "venue"
+    | "match"
+    | "referee"
+    | "carousel";
   mode?: "delete" | "remove";
   leagueId?: string;
   teamId?: string;
   playerId?: string;
 }
-
-
 
 export function DeleteModal({
   onClose,
@@ -50,6 +59,10 @@ export function DeleteModal({
   const deleteTeamMutation = useDeleteTeam();
   const deletePlayerMutation = useDeletePlayer();
   const deleteLeagueMutation = useDeleteLeague();
+  const deleteVenueMutation = useDeleteVenue();
+  const deleteMatchMutation = useDeleteMatch();
+  const deleteRefereeMutation = useDeleteReferee();
+  const deleteCarouselMutation = useDeleteCarousel();
   const removeTeamFromLeagueMutation = useRemoveTeamFromLeague();
   const removePlayerFromTeamForLeagueMutation =
     useRemovePlayerFromTeamForLeague();
@@ -58,7 +71,6 @@ export function DeleteModal({
   let mutation: any = null;
   let displayItemType: string = type;
   const actionText = mode === "remove" ? "Remove" : "Delete";
-
   if (mode === "remove") {
     if (type === "team") {
       mutation = removeTeamFromLeagueMutation;
@@ -75,6 +87,14 @@ export function DeleteModal({
         ? deletePlayerMutation
         : type === "league"
         ? deleteLeagueMutation
+        : type === "venue"
+        ? deleteVenueMutation
+        : type === "match"
+        ? deleteMatchMutation
+        : type === "referee"
+        ? deleteRefereeMutation
+        : type === "carousel"
+        ? deleteCarouselMutation
         : null;
   }
 
@@ -107,8 +127,7 @@ export function DeleteModal({
               },
             }
           );
-        }
-         else {
+        } else {
           toast.error("Error", {
             description: "Required identifiers are missing.",
           });
@@ -156,6 +175,7 @@ export function DeleteModal({
             toast.error("Error", {
               description: error.message,
             });
+            console.log("Error deleting item:", error);
           },
         });
       }
@@ -164,8 +184,13 @@ export function DeleteModal({
   return (
     <Dialog onOpenChange={setOpen} open={open}>
       <DialogTrigger className='flex items-center space-x-4'>
-        <Trash className='w-4 h-4 text-red-500' />{" "}
-        {type === "league" && <p className=''>{actionText} League</p>}
+        <Trash2 className='w-4 h-4 text-red-500' />{" "}
+        {type === "league" && (
+          <p className='text-red-600 focus:text-red-600'>{actionText} League</p>
+        )}
+        {type === "match" && (
+          <p className='text-red-600 focus:text-red-600'>{actionText} Match</p>
+        )}
       </DialogTrigger>
       <DialogContent className={`sm:max-w-[425px] ${className}`}>
         <DialogHeader>
