@@ -22,7 +22,8 @@ export default function Main({ playerId }: { playerId: string }) {
         playerName: player.name,
       });
     }
-  }, [player, setData]);
+    // eslint-disable-next-line
+  }, [player]);
 
   if (isLoading) {
     return (

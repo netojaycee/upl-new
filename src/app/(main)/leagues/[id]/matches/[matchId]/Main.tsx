@@ -86,7 +86,8 @@ export default function Main({
         matchTitle,
       });
     }
-  }, [match, league, setData]);
+    // eslint-disable-next-line
+  }, [match, league]);
 
   // Update match mutation
   const updateMatchMutation = useUpdateMatch();
@@ -652,17 +653,3 @@ export default function Main({
   );
 }
 
-
-// import React from 'react'
-
-// export default function Main({
-//     matchId,
-//     leagueId,
-//   }: {
-//     matchId: string;
-//     leagueId: string;
-//   }) {
-//   return (
-//     <div>Main</div>
-//   )
-// }

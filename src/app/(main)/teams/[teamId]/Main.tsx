@@ -41,7 +41,8 @@ export default function TeamDetailsPage({ teamId }: { teamId: string }) {
         teamName: team.name,
       });
     }
-  }, [team, setData]);
+    // eslint-disable-next-line
+  }, [team]);
 
   if (isTeamLoading || isPlayersLoading || isTeamsLoading) {
     return (

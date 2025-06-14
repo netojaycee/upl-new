@@ -172,6 +172,8 @@ export function MatchForm({
   const addStatMutation = useAddMatchStat();
   const deleteStatMutation = useDeleteMatchStat();
 
+  // console.log(match, "F")
+
   const form = useForm<MatchFormValues>({
     resolver: zodResolver(matchFormSchema),
     defaultValues: {
@@ -384,7 +386,8 @@ export function MatchForm({
       home: newStatForm.home,
     };
 
-    console.log("Adding new stat:", newStat);
+    // console.log("Adding new stat:", newStat);
+    
 
     addStatMutation.mutate(newStat, {
       onSuccess: () => {

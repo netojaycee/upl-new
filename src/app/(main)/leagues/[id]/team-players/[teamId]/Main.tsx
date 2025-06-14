@@ -39,7 +39,8 @@ export default function Main({ id, teamId }: { id: string; teamId: string }) {
         teamName: team.name,
       });
     }
-  }, [league, team, setData]);
+    // eslint-disable-next-line
+  }, [league, team]);
 
   console.log(players, "Players in league for team");
 

@@ -43,7 +43,8 @@ export default function NewsItemPage({ id }: { id: string }) {
         newsTitle: newsItem.title,
       });
     }
-  }, [newsItem, setData]);
+    // eslint-disable-next-line
+  }, [newsItem]);
 
   // If error, redirect back to news list
   useEffect(() => {
