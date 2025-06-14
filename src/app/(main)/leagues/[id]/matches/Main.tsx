@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   useLeague,
@@ -40,7 +40,6 @@ import {
   MoreVertical,
   Plus,
   Search,
-  
   Trophy,
   Upload,
   ListFilter,
@@ -54,6 +53,8 @@ import * as XLSX from "xlsx";
 import { MatchCalendarView } from "@/components/local/MatchCalendarView";
 import { MatchFilter } from "@/components/local/MatchFilter";
 import { DeleteModal } from "@/components/local/DeleteModal";
+import { usePageContext } from "@/lib/context/PageContext";
+import { useEffect } from "react";
 // import { DeleteModal } from "@/components/local/DeleteModal";
 
 export default function LeagueMatchesPage({ id }: { id: string }) {
@@ -70,6 +71,17 @@ export default function LeagueMatchesPage({ id }: { id: string }) {
   const addMatchMutation = useAddMatch();
   const updateMatchMutation = useUpdateMatch();
   const bulkAddMatchesMutation = useBulkAddMatches();
+
+  // Update page context with league data
+  const { setData } = usePageContext();
+
+  useEffect(() => {
+    if (league) {
+      setData({
+        leagueName: `${league.competition} ${league.year}`,
+      });
+    }
+  }, [league, setData]);
 
   // State
   const [isMatchFormOpen, setIsMatchFormOpen] = useState(false);
@@ -281,8 +293,6 @@ export default function LeagueMatchesPage({ id }: { id: string }) {
       setIsUploading(false);
     }
   };
-
- 
 
   // Download match template
   const downloadTemplate = () => {
@@ -502,9 +512,9 @@ export default function LeagueMatchesPage({ id }: { id: string }) {
                   <TableRow>
                     <TableHead>Match #</TableHead>
                     <TableHead>Date</TableHead>
-                    <TableHead>Teams</TableHead>
-                    <TableHead>Score</TableHead>
-                    <TableHead>Venue</TableHead>
+                    <TableHead className='w-[90%] mx-auto'>Teams</TableHead>
+                    {/* <TableHead>Score</TableHead> */}
+                    {/* <TableHead>Venue</TableHead> */}
                     <TableHead>Status</TableHead>
                     <TableHead className='text-right'>Actions</TableHead>
                   </TableRow>
@@ -544,7 +554,7 @@ export default function LeagueMatchesPage({ id }: { id: string }) {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className='flex items-center gap-2'>
+                        <div className='grid grid-cols-[3fr_1fr_1fr_1fr_3fr] items-center w-[90%] mx-auto'>
                           <div className='flex flex-col items-center'>
                             <div className='w-6 h-6 rounded-full overflow-hidden bg-muted'>
                               {match.homeTeamImageUrl ? (
@@ -557,9 +567,18 @@ export default function LeagueMatchesPage({ id }: { id: string }) {
                                 />
                               ) : null}
                             </div>
+
                             <span className='text-xs'>{match.homeTeam}</span>
                           </div>
+                          {match.status === MatchStatus.PLAYED && (
+                            <span className='text-xs ml-3'>
+                              {match.homeScore}
+                            </span>
+                          )}
                           <span className='mx-1 text-xs'>vs</span>
+                          {match.status === MatchStatus.PLAYED && (
+                            <span className='text-xs'>{match.awayScore}</span>
+                          )}
                           <div className='flex flex-col items-center'>
                             <div className='w-6 h-6 rounded-full overflow-hidden bg-muted'>
                               {match.awayTeamImageUrl ? (
@@ -576,7 +595,7 @@ export default function LeagueMatchesPage({ id }: { id: string }) {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      {/* <TableCell>
                         {match.status === MatchStatus.PLAYED ? (
                           <span className='font-medium'>
                             {match.homeScore} - {match.awayScore}
@@ -584,10 +603,10 @@ export default function LeagueMatchesPage({ id }: { id: string }) {
                         ) : (
                           <span className='text-muted-foreground'>-</span>
                         )}
-                      </TableCell>
-                      <TableCell className='max-w-[150px] truncate'>
+                      </TableCell> */}
+                      {/* <TableCell className='max-w-[150px] truncate'>
                         {match.venue}
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell>
                         <span
                           className={`px-2 py-1 rounded-full text-xs ${
@@ -635,7 +654,7 @@ export default function LeagueMatchesPage({ id }: { id: string }) {
                               <FileText className='h-4 w-4 mr-2' />
                               View Details
                             </DropdownMenuItem>
-                          
+
                             <div className='px-2 hover:bg-muted rounded-sm py-1'>
                               <DeleteModal
                                 onClose={() => {}}

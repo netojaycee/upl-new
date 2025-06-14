@@ -6,11 +6,12 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGetTeam, usePlayersByTeam, useTeams } from "@/lib/firebaseQueries";
 import { Loader2, Plus } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PlayerForm } from "@/components/local/forms/PlayerForm";
 import { Modal } from "@/components/local/Modal";
 import { Player } from "@/lib/types";
 import { PlayerCard } from "@/components/local/PlayerCard";
+import { usePageContext } from "@/lib/context/PageContext";
 
 export default function TeamDetailsPage({ teamId }: { teamId: string }) {
   const {
@@ -30,6 +31,17 @@ export default function TeamDetailsPage({ teamId }: { teamId: string }) {
   const router = useRouter();
   const [editPlayer, setEditPlayer] = useState<Player | null>(null);
   const [isAddPlayerModalOpen, setIsAddPlayerModalOpen] = useState(false);
+
+  // Update page context with team data
+  const { setData } = usePageContext();
+
+  useEffect(() => {
+    if (team) {
+      setData({
+        teamName: team.name,
+      });
+    }
+  }, [team, setData]);
 
   if (isTeamLoading || isPlayersLoading || isTeamsLoading) {
     return (

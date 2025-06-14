@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   useMatch,
@@ -9,6 +9,7 @@ import {
   useTeams,
   useVenues,
   useReferees,
+  useMatchStats,
 } from "@/lib/firebaseQueries";
 import {
   Card,
@@ -32,26 +33,60 @@ import {
   Users,
   BarChart,
   Info,
+  Target,
+  Circle,
+  X,
+  Minus,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import Image from "next/image";
-import { Match, MatchStatus } from "@/lib/types";
+import { Match, MatchStatus, StatType } from "@/lib/types";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { usePageContext } from "@/lib/context/PageContext";
 
-export default function Main({ matchId, leagueId }: { matchId: string; leagueId: string }) {
+export default function Main({
+  matchId,
+  leagueId,
+}: {
+  matchId: string;
+  leagueId: string;
+}) {
   const router = useRouter();
- 
 
   const [isMatchFormOpen, setIsMatchFormOpen] = useState(false);
 
   // Fetch data
-  const { data: match,  isLoading: isMatchLoading, error } = useMatch(matchId as string);
+  const {
+    data: match,
+    isLoading: isMatchLoading,
+    error,
+  } = useMatch(matchId as string);
   const { data: league } = useLeague(leagueId as string);
   const { data: teamsData } = useTeams();
   const { data: venues = [] } = useVenues();
   const { data: referees = [] } = useReferees(); // Add referees data
+  const { data: matchStats = [], isLoading: isStatsLoading } = useMatchStats(
+    matchId as string
+  );
+
+  // Update page context with match data
+  const { setData } = usePageContext();
+
+  useEffect(() => {
+    if (match && league) {
+      const matchTitle =
+        match.status === MatchStatus.PLAYED
+          ? `${match.homeTeam} ${match.homeScore} - ${match.awayScore} ${match.awayTeam}`
+          : `${match.homeTeam} vs ${match.awayTeam}`;
+
+      setData({
+        leagueName: `${league.competition} ${league.year}`,
+        matchTitle,
+      });
+    }
+  }, [match, league, setData]);
 
   // Update match mutation
   const updateMatchMutation = useUpdateMatch();
@@ -178,6 +213,36 @@ export default function Main({ matchId, leagueId }: { matchId: string; leagueId:
         return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
       default:
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
+    }
+  };
+
+  // Get stat icon
+  const getStatIcon = (type: StatType) => {
+    const iconClass = "h-4 w-4";
+    switch (type) {
+      case StatType.YELLOW:
+        return <div className={`${iconClass} bg-yellow-400 rounded-sm`} />;
+      case StatType.SECOND_YELLOW:
+        return (
+          <div className='flex gap-0.5'>
+            <div className={`${iconClass} bg-yellow-400 rounded-sm`} />
+            <div className={`${iconClass} bg-yellow-400 rounded-sm`} />
+          </div>
+        );
+      case StatType.RED:
+        return <div className={`${iconClass} bg-red-500 rounded-sm`} />;
+      case StatType.GOAL:
+        return <Target className={`${iconClass} text-green-600`} />;
+      case StatType.PENALTY_GOAL:
+        return <Target className={`${iconClass} text-blue-600`} />;
+      case StatType.OWN_GOAL:
+        return <Target className={`${iconClass} text-red-600`} />;
+      case StatType.CANCELLED_GOAL:
+        return <X className={`${iconClass} text-red-500`} />;
+      case StatType.MISSED_PENALTY:
+        return <Minus className={`${iconClass} text-gray-500`} />;
+      default:
+        return <Circle className={`${iconClass} text-gray-400`} />;
     }
   };
 
@@ -348,12 +413,205 @@ export default function Main({ matchId, leagueId }: { matchId: string; leagueId:
 
             {/* Stats tab */}
             <TabsContent value='stats'>
-              <div className='min-h-[300px] flex items-center justify-center flex-col space-y-4'>
-                <BarChart className='h-16 w-16 text-muted-foreground opacity-20' />
-                <p className='text-muted-foreground'>
-                  Match statistics not available
-                </p>
-              </div>
+              {isStatsLoading ? (
+                <div className='min-h-[300px] flex items-center justify-center'>
+                  <div className='relative'>
+                    <Circle className='h-12 w-12 text-muted-foreground/20 opacity-70 animate-pulse' />
+                    <div className='absolute inset-0 m-auto animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full' />
+                  </div>
+                </div>
+              ) : matchStats.length === 0 ? (
+                <div className='min-h-[300px] flex items-center justify-center flex-col space-y-4'>
+                  <BarChart className='h-16 w-16 text-muted-foreground opacity-20' />
+                  <p className='text-muted-foreground'>
+                    No match statistics available
+                  </p>
+                </div>
+              ) : (
+                <div className='space-y-6'>
+                  <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
+                    {/* Home Team Stats */}
+                    <div className='space-y-4'>
+                      <h3 className='font-semibold text-lg flex items-center gap-2'>
+                        <div className='w-8 h-8 rounded-full overflow-hidden bg-muted'>
+                          {match.homeTeamImageUrl ? (
+                            <Image
+                              src={match.homeTeamImageUrl}
+                              alt={match.homeTeam}
+                              width={32}
+                              height={32}
+                              className='object-cover'
+                            />
+                          ) : (
+                            <Users className='h-4 w-4 m-auto mt-2 text-muted-foreground' />
+                          )}
+                        </div>
+                        {match.homeTeam}
+                      </h3>
+                      <div className='space-y-2'>
+                        {matchStats
+                          .filter((stat) => stat.home === true)
+                          .map((stat) => (
+                            <div
+                              key={stat.id}
+                              className='flex items-center gap-3 p-3 bg-muted/30 rounded-lg'
+                            >
+                              <div className='flex items-center gap-2'>
+                                {getStatIcon(stat.type as StatType)}
+                                <span className='text-xs bg-muted px-2 py-1 rounded'>
+                                  {stat.minute}&apos;
+                                </span>
+                              </div>
+                              <div className='flex items-center gap-2 flex-1'>
+                                <div className='w-6 h-6 rounded-full overflow-hidden bg-muted'>
+                                  {stat.playerImageUrl ? (
+                                    <Image
+                                      src={stat.playerImageUrl}
+                                      alt={stat.name}
+                                      width={24}
+                                      height={24}
+                                      className='object-cover'
+                                    />
+                                  ) : (
+                                    <User className='h-3 w-3 m-auto mt-1.5 text-muted-foreground' />
+                                  )}
+                                </div>
+                                <span className='text-sm font-medium'>
+                                  {stat.name}
+                                </span>
+                              </div>
+                              <span className='text-xs text-muted-foreground capitalize'>
+                                {stat.type.replace("_", " ")}
+                              </span>
+                            </div>
+                          ))}
+                        {matchStats.filter((stat) => stat.home === true)
+                          .length === 0 && (
+                          <p className='text-muted-foreground text-sm text-center py-4'>
+                            No stats recorded
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Away Team Stats */}
+                    <div className='space-y-4'>
+                      <h3 className='font-semibold text-lg flex items-center gap-2'>
+                        <div className='w-8 h-8 rounded-full overflow-hidden bg-muted'>
+                          {match.awayTeamImageUrl ? (
+                            <Image
+                              src={match.awayTeamImageUrl}
+                              alt={match.awayTeam}
+                              width={32}
+                              height={32}
+                              className='object-cover'
+                            />
+                          ) : (
+                            <Users className='h-4 w-4 m-auto mt-2 text-muted-foreground' />
+                          )}
+                        </div>
+                        {match.awayTeam}
+                      </h3>
+                      <div className='space-y-2'>
+                        {matchStats
+                          .filter((stat) => stat.home === false)
+                          .map((stat) => (
+                            <div
+                              key={stat.id}
+                              className='flex items-center gap-3 p-3 bg-muted/30 rounded-lg'
+                            >
+                              <div className='flex items-center gap-2'>
+                                {getStatIcon(stat.type as StatType)}
+                                <span className='text-xs bg-muted px-2 py-1 rounded'>
+                                  {stat.minute}&apos;
+                                </span>
+                              </div>
+                              <div className='flex items-center gap-2 flex-1'>
+                                <div className='w-6 h-6 rounded-full overflow-hidden bg-muted'>
+                                  {stat.playerImageUrl ? (
+                                    <Image
+                                      src={stat.playerImageUrl}
+                                      alt={stat.name}
+                                      width={24}
+                                      height={24}
+                                      className='object-cover'
+                                    />
+                                  ) : (
+                                    <User className='h-3 w-3 m-auto mt-1.5 text-muted-foreground' />
+                                  )}
+                                </div>
+                                <span className='text-sm font-medium'>
+                                  {stat.name}
+                                </span>
+                              </div>
+                              <span className='text-xs text-muted-foreground capitalize'>
+                                {stat.type.replace("_", " ")}
+                              </span>
+                            </div>
+                          ))}
+                        {matchStats.filter((stat) => stat.home === false)
+                          .length === 0 && (
+                          <p className='text-muted-foreground text-sm text-center py-4'>
+                            No stats recorded
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Timeline View */}
+                  <div className='mt-8'>
+                    <h3 className='font-semibold text-lg mb-4'>
+                      Match Timeline
+                    </h3>
+                    <div className='space-y-2'>
+                      {matchStats
+                        .sort((a, b) => parseInt(a.minute) - parseInt(b.minute))
+                        .map((stat) => (
+                          <div
+                            key={stat.id}
+                            className={`flex items-center gap-4 p-3 rounded-lg ${
+                              stat.home
+                                ? "bg-blue-50 dark:bg-blue-950"
+                                : "bg-orange-50 dark:bg-orange-950"
+                            }`}
+                          >
+                            <span className='text-sm font-mono bg-muted px-2 py-1 rounded min-w-[40px] text-center'>
+                              {stat.minute}&apos;
+                            </span>
+                            <div className='flex items-center gap-2'>
+                              {getStatIcon(stat.type as StatType)}
+                              <span className='text-sm capitalize'>
+                                {stat.type.replace("_", " ")}
+                              </span>
+                            </div>
+                            <div className='flex items-center gap-2 flex-1'>
+                              <div className='w-6 h-6 rounded-full overflow-hidden bg-muted'>
+                                {stat.playerImageUrl ? (
+                                  <Image
+                                    src={stat.playerImageUrl}
+                                    alt={stat.name}
+                                    width={24}
+                                    height={24}
+                                    className='object-cover'
+                                  />
+                                ) : (
+                                  <User className='h-3 w-3 m-auto mt-1.5 text-muted-foreground' />
+                                )}
+                              </div>
+                              <span className='text-sm font-medium'>
+                                {stat.name}
+                              </span>
+                              <span className='text-xs text-muted-foreground'>
+                                ({stat.teamName})
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </TabsContent>
 
             {/* Report tab */}
@@ -393,3 +651,18 @@ export default function Main({ matchId, leagueId }: { matchId: string; leagueId:
     </div>
   );
 }
+
+
+// import React from 'react'
+
+// export default function Main({
+//     matchId,
+//     leagueId,
+//   }: {
+//     matchId: string;
+//     leagueId: string;
+//   }) {
+//   return (
+//     <div>Main</div>
+//   )
+// }

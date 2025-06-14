@@ -10,10 +10,11 @@ import {
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Plus } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { PlayerCard } from "@/components/local/PlayerCard";
 import { AddPlayersDrawer } from "@/components/local/AddPlayersDrawer";
 import { toast } from "sonner";
+import { usePageContext } from "@/lib/context/PageContext";
 
 export default function Main({ id, teamId }: { id: string; teamId: string }) {
   const leagueId = id;
@@ -28,6 +29,18 @@ export default function Main({ id, teamId }: { id: string; teamId: string }) {
 
   const addPlayersMutation = useAddPlayersToTeamForLeague();
 
+  // Update page context with league and team data
+  const { setData } = usePageContext();
+
+  useEffect(() => {
+    if (league && team) {
+      setData({
+        leagueName: `${league.competition} ${league.year}`,
+        teamName: team.name,
+      });
+    }
+  }, [league, team, setData]);
+
   console.log(players, "Players in league for team");
 
   // Players in the team but not yet registered for the league
@@ -39,7 +52,12 @@ export default function Main({ id, teamId }: { id: string; teamId: string }) {
     [allPlayers, players]
   );
 
-  if (isLeagueLoading || isPlayersLoading || isAllPlayersLoading || isTeamLoading) {
+  if (
+    isLeagueLoading ||
+    isPlayersLoading ||
+    isAllPlayersLoading ||
+    isTeamLoading
+  ) {
     return (
       <div className='flex justify-center py-8'>
         <Loader2 className='h-8 w-8 animate-spin' />
@@ -113,7 +131,6 @@ export default function Main({ id, teamId }: { id: string; teamId: string }) {
           );
           setShowDrawer(false);
         }}
-      
       />
     </div>
   );

@@ -11,13 +11,14 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, Users, User, Trophy } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 // import { ManageTeamsModal } from "@/components/local/ManageTeamsModal";
 // import { ManagePlayersDrawer } from "@/components/local/ManagePlayersDrawer";
 import { TeamCard } from "@/components/local/TeamCard";
 import { AddTeamsDrawer } from "@/components/local/AddTeamsDrawer";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { usePageContext } from "@/lib/context/PageContext";
 
 export default function Main({ id }: { id: string }) {
   const { data: league, isLoading, error } = useLeague(decodeURIComponent(id));
@@ -35,6 +36,19 @@ export default function Main({ id }: { id: string }) {
   // const [showTeamsModal, setShowTeamsModal] = useState(false);
   // const [showPlayersDrawer, setShowPlayersDrawer] = useState(false);
   const [showAddTeamsDrawer, setShowAddTeamsDrawer] = useState(false);
+
+  // Update page context with league data
+  const { setData } = usePageContext();
+
+  useEffect(() => {
+    if (league) {
+      // eslint-disable-next-line
+      setData({
+        leagueName: `${league.competition} ${league.year}`,
+      });
+    }
+    // eslint-disable-next-line
+  }, [league]);
 
   console.log(leagueTeams, "jjj");
 

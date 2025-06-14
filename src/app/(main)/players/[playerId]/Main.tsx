@@ -6,10 +6,23 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGetPlayer } from "@/lib/firebaseQueries";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
+import { useEffect } from "react";
+import { usePageContext } from "@/lib/context/PageContext";
 
 export default function Main({ playerId }: { playerId: string }) {
   const { data: player, isLoading, error } = useGetPlayer(playerId);
   const router = useRouter();
+
+  // Update page context with player data
+  const { setData } = usePageContext();
+
+  useEffect(() => {
+    if (player) {
+      setData({
+        playerName: player.name,
+      });
+    }
+  }, [player, setData]);
 
   if (isLoading) {
     return (

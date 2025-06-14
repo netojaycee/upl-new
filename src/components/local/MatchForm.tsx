@@ -6,8 +6,25 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Loader2 } from "lucide-react";
-import { Team, Match, MatchStatus, Venue, Referee } from "@/lib/types";
+import {
+  Calendar as CalendarIcon,
+  Loader2,
+  Plus,
+  Target,
+  Circle,
+  X,
+  Minus,
+  Trash2,
+} from "lucide-react";
+import {
+  Team,
+  Match,
+  MatchStatus,
+  Venue,
+  Referee,
+  NewMatchStat,
+  StatType,
+} from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Timestamp } from "firebase/firestore"; // Import Firebase Timestamp
@@ -39,33 +56,35 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card } from "@/components/ui/card";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import {
+  useMatchStats,
+  useAddMatchStat,
+  useDeleteMatchStat,
+  usePlayersInTeamForLeague,
+} from "@/lib/firebaseQueries";
+import { toast } from "sonner";
 
 // First, update the Zod schema to properly validate time fields
 const matchFormSchema = z.object({
   homeTeamId: z.string().min(1, "Home team is required"),
-  awayTeamId: z
-    .string()
-    .min(1, "Away team is required"),
-    // .refine(
-    //   (value, ctx) => {
-    //     return value !== ctx.data.homeTeamId;
-    //   },
-    //   {
-    //     message: "Home and away teams cannot be the same",
-    //   }
-    // ),
+  awayTeamId: z.string().min(1, "Away team is required"),
+  // .refine(
+  //   (value, ctx) => {
+  //     return value !== ctx.data.homeTeamId;
+  //   },
+  //   {
+  //     message: "Home and away teams cannot be the same",
+  //   }
+  // ),
   date: z.date({
     required_error: "Match date is required",
   }),
   venue: z.string().min(1, "Venue is required"),
-  matchNo: z.coerce
-    .number()
-    .int()
-    .positive()
-    .or(z.literal(0))
-    .default(0),
+  matchNo: z.coerce.number().int().positive().or(z.literal(0)).default(0),
   referee: z.string().optional().default(""),
   status: z.nativeEnum(MatchStatus).default(MatchStatus.NOT_PLAYED),
   homeScore: z.coerce
@@ -82,16 +101,14 @@ const matchFormSchema = z.object({
     .default(0),
   report: z.string().optional().nullable(),
   // Add time fields to the schema
-  timeHours: z.string()
-    .refine(val => {
-      const num = parseInt(val);
-      return !isNaN(num) && num >= 1 && num <= 12;
-    }, "Hours must be between 1-12"),
-  timeMinutes: z.string()
-    .refine(val => {
-      const num = parseInt(val);
-      return !isNaN(num) && num >= 0 && num <= 59;
-    }, "Minutes must be between 0-59"),
+  timeHours: z.string().refine((val) => {
+    const num = parseInt(val);
+    return !isNaN(num) && num >= 1 && num <= 12;
+  }, "Hours must be between 1-12"),
+  timeMinutes: z.string().refine((val) => {
+    const num = parseInt(val);
+    return !isNaN(num) && num >= 0 && num <= 59;
+  }, "Minutes must be between 0-59"),
   timePeriod: z.enum(["AM", "PM"], {
     required_error: "Period (AM/PM) is required",
   }),
@@ -128,38 +145,61 @@ export function MatchForm({
   const [homeTeam, setHomeTeam] = useState<Team | null>(null);
   const [awayTeam, setAwayTeam] = useState<Team | null>(null);
 
+  // Stats management state
+  const [newStatForm, setNewStatForm] = useState({
+    playerId: "",
+    playerName: "",
+    playerImageUrl: "",
+    teamId: "",
+    teamName: "",
+    type: StatType.GOAL,
+    minute: "",
+    home: true,
+  });
 
-    const form = useForm<MatchFormValues>({
-      resolver: zodResolver(matchFormSchema),
-      defaultValues: {
-        homeTeamId: "",
-        awayTeamId: "",
-        date: new Date(),
-        venue: "",
-        matchNo: 0,
-        referee: "",
-        status: MatchStatus.NOT_PLAYED,
-        homeScore: 0,
-        awayScore: 0,
-        report: null,
-        timeHours: "12",
-        timeMinutes: "00",
-        timePeriod: "PM",
-      },
-    });
+  // Stats queries
+  const { data: matchStats = [], isLoading: isStatsLoading } = useMatchStats(
+    match?.id || ""
+  );
+  const { data: homeTeamPlayers = [] } = usePlayersInTeamForLeague(
+    leagueId,
+    homeTeam?.id || ""
+  );
+  const { data: awayTeamPlayers = [] } = usePlayersInTeamForLeague(
+    leagueId,
+    awayTeam?.id || ""
+  );
+  const addStatMutation = useAddMatchStat();
+  const deleteStatMutation = useDeleteMatchStat();
 
-
-  
+  const form = useForm<MatchFormValues>({
+    resolver: zodResolver(matchFormSchema),
+    defaultValues: {
+      homeTeamId: "",
+      awayTeamId: "",
+      date: new Date(),
+      venue: "",
+      matchNo: 0,
+      referee: "",
+      status: MatchStatus.NOT_PLAYED,
+      homeScore: 0,
+      awayScore: 0,
+      report: null,
+      timeHours: "12",
+      timeMinutes: "00",
+      timePeriod: "PM",
+    },
+  });
 
   useEffect(() => {
     if (match && isEditMode) {
       // Find teams
       const homeTeam = teams.find((t) => t.id === match.homeTeamId) || null;
       const awayTeam = teams.find((t) => t.id === match.awayTeamId) || null;
-  
+
       setHomeTeam(homeTeam);
       setAwayTeam(awayTeam);
-  
+
       // Handle date from Firebase - could be string, Date, or Firestore Timestamp
       let matchDate: Date;
       if (typeof match.date === "string") {
@@ -176,16 +216,16 @@ export function MatchForm({
       } else {
         matchDate = new Date();
       }
-      
+
       // Extract time components from the date
       let hours = matchDate.getHours();
       const minutes = matchDate.getMinutes();
       const period = hours >= 12 ? "PM" : "AM";
-      
+
       // Convert hours to 12-hour format
       if (hours > 12) hours -= 12;
       else if (hours === 0) hours = 12;
-      
+
       form.reset({
         homeTeamId: match.homeTeamId,
         awayTeamId: match.awayTeamId,
@@ -197,8 +237,8 @@ export function MatchForm({
         homeScore: match.homeScore,
         awayScore: match.awayScore,
         report: match.report,
-        timeHours: hours.toString().padStart(2, '0'),
-        timeMinutes: minutes.toString().padStart(2, '0'),
+        timeHours: hours.toString().padStart(2, "0"),
+        timeMinutes: minutes.toString().padStart(2, "0"),
         timePeriod: period,
       });
     }
@@ -255,16 +295,16 @@ export function MatchForm({
       // Convert to Firebase Timestamp
       const timestamp = Timestamp.fromDate(combinedDate);
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { timeHours, timeMinutes, timePeriod, ...restValues } = values;
-    const formattedValues = {
-      ...restValues,
-      date: timestamp, // Send the Firebase Timestamp
-      leagueId,
-      competition,
-    };
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { timeHours, timeMinutes, timePeriod, ...restValues } = values;
+      const formattedValues = {
+        ...restValues,
+        date: timestamp, // Send the Firebase Timestamp
+        leagueId,
+        competition,
+      };
 
-    //   console.log("Submitting match form with values:", formattedValues);
+      //   console.log("Submitting match form with values:", formattedValues);
 
       if (isEditMode && match) {
         onSubmit({ id: match.id, ...formattedValues });
@@ -274,6 +314,95 @@ export function MatchForm({
     } catch (err) {
       console.error("Error submitting form:", err);
     }
+  };
+
+  // Helper function to get stat icons
+  const getStatIcon = (type: StatType) => {
+    const iconClass = "h-4 w-4";
+    switch (type) {
+      case StatType.YELLOW:
+        return <div className={`${iconClass} bg-yellow-400 rounded-sm`} />;
+      case StatType.SECOND_YELLOW:
+        return (
+          <div className='flex gap-0.5'>
+            <div className={`${iconClass} bg-yellow-400 rounded-sm`} />
+            <div className={`${iconClass} bg-yellow-400 rounded-sm`} />
+          </div>
+        );
+      case StatType.RED:
+        return <div className={`${iconClass} bg-red-500 rounded-sm`} />;
+      case StatType.GOAL:
+        return <Target className={`${iconClass} text-green-600`} />;
+      case StatType.PENALTY_GOAL:
+        return <Target className={`${iconClass} text-blue-600`} />;
+      case StatType.OWN_GOAL:
+        return <Target className={`${iconClass} text-red-600`} />;
+      case StatType.CANCELLED_GOAL:
+        return <X className={`${iconClass} text-red-500`} />;
+      case StatType.MISSED_PENALTY:
+        return <Minus className={`${iconClass} text-gray-500`} />;
+      default:
+        return <Circle className={`${iconClass} text-gray-400`} />;
+    }
+  };
+
+  // Handle adding new stat
+  const handleAddStat = () => {
+    if (!match || !newStatForm.playerId || !newStatForm.minute) return;
+
+    const matchTitle = `${homeTeam?.name || ""} ${match.homeScore} vs ${
+      match.awayScore
+    } ${awayTeam?.name || ""}`;
+
+    const newStat: NewMatchStat = {
+      matchId: match.id,
+      matchTitle,
+      leagueId,
+      playerId: newStatForm.playerId,
+      name: newStatForm.playerName,
+      playerImageUrl: newStatForm.playerImageUrl,
+      teamId: newStatForm.teamId,
+      teamName: newStatForm.teamName,
+      type: newStatForm.type,
+      minute: newStatForm.minute,
+      home: newStatForm.home,
+    };
+
+    addStatMutation.mutate(newStat, {
+      onSuccess: () => {
+        toast.success("Statistic added successfully");
+        // Reset form
+        setNewStatForm({
+          playerId: "",
+          playerName: "",
+          playerImageUrl: "",
+          teamId: "",
+          teamName: "",
+          type: StatType.GOAL,
+          minute: "",
+          home: true,
+        });
+      },
+      onError: (error) => {
+        toast.error("Failed to add statistic", {
+          description: error.message,
+        });
+      },
+    });
+  };
+
+  // Handle deleting stat
+  const handleDeleteStat = (statId: string) => {
+    deleteStatMutation.mutate(statId, {
+      onSuccess: () => {
+        toast.success("Statistic deleted successfully");
+      },
+      onError: (error) => {
+        toast.error("Failed to delete statistic", {
+          description: error.message,
+        });
+      },
+    });
   };
 
   return (
@@ -715,6 +844,194 @@ export function MatchForm({
               />
             )}
 
+            {/* Stats Management Section - Only show in edit mode */}
+            {isEditMode && match && (
+              <div className='space-y-4'>
+                <div className='border-t pt-4'>
+                  <h3 className='text-lg font-semibold mb-4'>
+                    Match Statistics
+                  </h3>
+                  <Tabs defaultValue='stats' className='w-full'>
+                    <TabsList className='grid w-full grid-cols-2'>
+                      <TabsTrigger value='stats'>View Stats</TabsTrigger>
+                      <TabsTrigger value='add'>Add Stat</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value='stats' className='space-y-4'>
+                      {isStatsLoading ? (
+                        <div className='flex justify-center py-4'>
+                          <Loader2 className='h-6 w-6 animate-spin' />
+                        </div>
+                      ) : matchStats.length === 0 ? (
+                        <p className='text-center text-muted-foreground py-4'>
+                          No match statistics recorded yet.
+                        </p>
+                      ) : (
+                        <div className='grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[300px] overflow-y-auto'>
+                          {matchStats.map((stat) => (
+                            <Card key={stat.id} className='p-3'>
+                              <div className='flex items-center justify-between'>
+                                <div className='flex items-center gap-2'>
+                                  {getStatIcon(stat.type)}
+                                  <div>
+                                    <p className='font-medium text-sm'>
+                                      {stat.name}
+                                    </p>
+                                    <p className='text-xs text-muted-foreground'>
+                                      {stat.teamName} • {stat.minute}&apos; •{" "}
+                                      {stat.type.replace("_", " ")}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className='flex gap-1'>
+                                  <Button
+                                    size='sm'
+                                    variant='ghost'
+                                    onClick={() => handleDeleteStat(stat.id)}
+                                  >
+                                    <Trash2 className='h-3 w-3' />
+                                  </Button>
+                                </div>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value='add' className='space-y-4'>
+                      <div className='grid grid-cols-2 gap-4'>
+                        <div>
+                          <label className='text-sm font-medium'>Team</label>
+                          <Select
+                            value={newStatForm.home ? "home" : "away"}
+                            onValueChange={(value) => {
+                              const isHome = value === "home";
+                              setNewStatForm((prev) => ({
+                                ...prev,
+                                home: isHome,
+                                teamId: isHome
+                                  ? homeTeam?.id || ""
+                                  : awayTeam?.id || "",
+                                teamName: isHome
+                                  ? homeTeam?.name || ""
+                                  : awayTeam?.name || "",
+                                playerId: "",
+                                playerName: "",
+                                playerImageUrl: "",
+                              }));
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder='Select team' />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value='home'>
+                                {homeTeam?.name || "Home Team"}
+                              </SelectItem>
+                              <SelectItem value='away'>
+                                {awayTeam?.name || "Away Team"}
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <label className='text-sm font-medium'>Player</label>
+                          <Select
+                            value={newStatForm.playerId}
+                            onValueChange={(playerId) => {
+                              const players = newStatForm.home
+                                ? homeTeamPlayers
+                                : awayTeamPlayers;
+                              const player = players.find(
+                                (p) => p.id === playerId
+                              );
+                              if (player) {
+                                setNewStatForm((prev) => ({
+                                  ...prev,
+                                  playerId: player.id,
+                                  playerName: player.name,
+                                  playerImageUrl: player.imageUrl || "",
+                                }));
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder='Select player' />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {(newStatForm.home
+                                ? homeTeamPlayers
+                                : awayTeamPlayers
+                              ).map((player) => (
+                                <SelectItem key={player.id} value={player.id}>
+                                  {player.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <label className='text-sm font-medium'>
+                            Stat Type
+                          </label>
+                          <Select
+                            value={newStatForm.type}
+                            onValueChange={(type) =>
+                              setNewStatForm((prev) => ({
+                                ...prev,
+                                type: type as StatType,
+                              }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder='Select stat type' />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.values(StatType).map((type) => (
+                                <SelectItem key={type} value={type}>
+                                  {type.replace("_", " ")}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <label className='text-sm font-medium'>Minute</label>
+                          <Input
+                            type='number'
+                            min='1'
+                            max='120'
+                            placeholder='90'
+                            value={newStatForm.minute}
+                            onChange={(e) =>
+                              setNewStatForm((prev) => ({
+                                ...prev,
+                                minute: e.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+
+                      <Button
+                        type='button'
+                        onClick={handleAddStat}
+                        disabled={!newStatForm.playerId || !newStatForm.minute}
+                        className='w-full'
+                      >
+                        <Plus className='h-4 w-4 mr-2' />
+                        Add Statistic
+                      </Button>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              </div>
+            )}
+
             <div className='flex gap-2 fixed bottom-0 bg-background  border-t w-full justify-end px-8 py-4 right-2'>
               <SheetClose asChild>
                 <Button variant='outline' type='button'>
@@ -737,4 +1054,3 @@ export function MatchForm({
     </Sheet>
   );
 }
-

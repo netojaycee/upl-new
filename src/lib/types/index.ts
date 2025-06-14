@@ -197,3 +197,43 @@ export interface NewNews {
     tags: string[];
     imageFile?: File;
 }
+
+export enum StatType {
+    YELLOW = 'yellow',
+    SECOND_YELLOW = 'second yellow',
+    RED = 'red',
+    GOAL = 'goal',
+    PENALTY_GOAL = 'penalty goal',
+    OWN_GOAL = 'own goal',
+    CANCELLED_GOAL = 'cancelled goal',
+    MISSED_PENALTY = 'missed penalty'
+}
+
+export interface MatchStat {
+    id: string;
+    matchId: string;
+    matchTitle: string;
+    leagueId: string;
+    playerId: string;
+    name: string;
+    playerImageUrl: string;
+    teamId: string;
+    teamName: string;
+    type: StatType;
+    minute: string;
+    home: boolean;
+}
+
+export interface NewMatchStat {
+    matchId: string;
+    matchTitle: string;
+    leagueId: string;
+    playerId: string;
+    name: string;
+    playerImageUrl: string;
+    teamId: string;
+    teamName: string;
+    type: StatType;
+    minute: string;
+    home: boolean;
+}

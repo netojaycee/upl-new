@@ -9,7 +9,7 @@ import {
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth"; // Add this import
 import { auth, db } from "./firebase"; // Import auth from firebase.ts
 import { User } from "firebase/auth";
-import { League, LoginCredentials, NewLeague, NewPlayer, NewTeam, Player, Team, Match, MatchStatus, NewMatch, BulkMatchUpload, Venue, NewVenue, Referee, NewReferee, Carousel, NewCarousel, Settings, News, NewNews } from "./types";
+import { League, LoginCredentials, NewLeague, NewPlayer, NewTeam, Player, Team, Match, MatchStatus, NewMatch, BulkMatchUpload, Venue, NewVenue, Referee, NewReferee, Carousel, NewCarousel, Settings, News, NewNews, MatchStat, NewMatchStat } from "./types";
 import useAuthStore from "./store";
 import {
     collection,
@@ -1500,12 +1500,12 @@ export const useUpdateNews = () => {
             }
 
             // Prepare update data
-            const newsData: { 
-                title: string; 
-                body: string; 
-                updatedAt: string; 
-                tags: string[]; 
-                imgUrl?: string 
+            const newsData: {
+                title: string;
+                body: string;
+                updatedAt: string;
+                tags: string[];
+                imgUrl?: string
             } = {
                 title: updatedNews.title,
                 body: updatedNews.body,
@@ -1585,6 +1585,145 @@ export const useDeleteNews = () => {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["news"] });
+        },
+    });
+};
+
+// --- MATCH STATS QUERIES ---
+
+export const useMatchStats = (matchId: string) => {
+    const { user } = useAuthStore();
+
+    return useQuery({
+        queryKey: ["matchStats", matchId],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+            if (!matchId) return [];
+
+            const collRef: CollectionReference<DocumentData> = collection(db, "stats");
+            const q = query(collRef, where("matchId", "==", matchId), orderBy("minute", "asc"));
+            const snapshot = await getDocs(q);
+
+            return snapshot.docs.map(
+                (doc) => ({
+                    id: doc.id,
+                    ...doc.data(),
+                } as MatchStat)
+            );
+        },
+        enabled: !!user && !!matchId,
+    });
+};
+
+export const useMatchStat = (statId: string | null) => {
+    const { user } = useAuthStore();
+
+    return useQuery({
+        queryKey: ["matchStat", statId],
+        queryFn: async () => {
+            if (!user) throw new Error("User not authenticated");
+            if (!statId) throw new Error("Stat ID is required");
+
+            const statRef = doc(db, "stats", statId);
+            const docSnap = await getDoc(statRef);
+            if (!docSnap.exists()) throw new Error("Stat not found");
+
+            return { id: docSnap.id, ...docSnap.data() } as MatchStat;
+        },
+        enabled: !!user && !!statId,
+    });
+};
+
+export const useAddMatchStat = () => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (newStat: NewMatchStat) => {
+            if (!user) throw new Error("User not authenticated");
+
+            const collRef: CollectionReference<DocumentData> = collection(db, "stats");
+
+            const statData = {
+                matchId: newStat.matchId,
+                matchTitle: newStat.matchTitle,
+                leagueId: newStat.leagueId,
+                playerId: newStat.playerId,
+                name: newStat.name,
+                playerImageUrl: newStat.playerImageUrl,
+                teamId: newStat.teamId,
+                teamName: newStat.teamName,
+                type: newStat.type,
+                minute: newStat.minute,
+                home: newStat.home,
+            };
+
+            const docRef = await addDoc(collRef, statData);
+            return { id: docRef.id, ...statData } as MatchStat;
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ["matchStats", variables.matchId] });
+        },
+    });
+};
+
+export const useUpdateMatchStat = () => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (updatedStat: MatchStat) => {
+            if (!user) throw new Error("User not authenticated");
+
+            const statRef = doc(db, "stats", updatedStat.id);
+            const docSnap = await getDoc(statRef);
+
+            if (!docSnap.exists()) throw new Error("Stat not found");
+
+            const statData = {
+                matchId: updatedStat.matchId,
+                matchTitle: updatedStat.matchTitle,
+                leagueId: updatedStat.leagueId,
+                playerId: updatedStat.playerId,
+                name: updatedStat.name,
+                playerImageUrl: updatedStat.playerImageUrl,
+                teamId: updatedStat.teamId,
+                teamName: updatedStat.teamName,
+                type: updatedStat.type,
+                minute: updatedStat.minute,
+                home: updatedStat.home,
+            };
+
+            await updateDoc(statRef, statData);
+            return updatedStat;
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["matchStats", data.matchId] });
+            queryClient.invalidateQueries({ queryKey: ["matchStat", data.id] });
+        },
+    });
+};
+
+export const useDeleteMatchStat = () => {
+    const { user } = useAuthStore();
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (statId: string) => {
+            if (!user) throw new Error("User not authenticated");
+
+            const statRef = doc(db, "stats", statId);
+            const docSnap = await getDoc(statRef);
+
+            if (!docSnap.exists()) throw new Error("Stat not found");
+
+            const statData = docSnap.data();
+            await deleteDoc(statRef);
+
+            return statData.matchId;
+        },
+        onSuccess: (matchId) => {
+            queryClient.invalidateQueries({ queryKey: ["matchStats", matchId] });
         },
     });
 };

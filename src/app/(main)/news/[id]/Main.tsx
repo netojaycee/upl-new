@@ -27,11 +27,23 @@ import { useRouter } from "next/navigation";
 import { DeleteModal } from "@/components/local/DeleteModal";
 import { toast } from "sonner";
 import useAuthStore from "@/lib/store";
+import { usePageContext } from "@/lib/context/PageContext";
 
-export default function NewsItemPage({ id }:  { id: string  }) {
+export default function NewsItemPage({ id }: { id: string }) {
   const router = useRouter();
   const { user } = useAuthStore();
   const { data: newsItem, isLoading, isError, error } = useNewsItem(id);
+
+  // Update page context with news data
+  const { setData } = usePageContext();
+
+  useEffect(() => {
+    if (newsItem) {
+      setData({
+        newsTitle: newsItem.title,
+      });
+    }
+  }, [newsItem, setData]);
 
   // If error, redirect back to news list
   useEffect(() => {
