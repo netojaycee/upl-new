@@ -81,7 +81,8 @@ export default function LeagueMatchesPage({ id }: { id: string }) {
         leagueName: `${league.competition} ${league.year}`,
       });
     }
-  }, [league, setData]);
+    // eslint-disable-next-line
+  }, [league]);
 
   // State
   const [isMatchFormOpen, setIsMatchFormOpen] = useState(false);

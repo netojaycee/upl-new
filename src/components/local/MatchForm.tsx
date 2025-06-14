@@ -263,6 +263,17 @@ export function MatchForm({
     }, []);
 
     // Cleanup subscription
+    // Also check current form values on mount/teams change
+    const currentValues = form.getValues();
+    if (currentValues.homeTeamId) {
+      const team = teams.find((t) => t.id === currentValues.homeTeamId) || null;
+      setHomeTeam(team);
+    }
+    if (currentValues.awayTeamId) {
+      const team = teams.find((t) => t.id === currentValues.awayTeamId) || null;
+      setAwayTeam(team);
+    }
+
     return () => subscription.unsubscribe();
   }, [form, teams]);
 
@@ -354,6 +365,11 @@ export function MatchForm({
       match.awayScore
     } ${awayTeam?.name || ""}`;
 
+    const formattedMinute = String(parseInt(newStatForm.minute)).padStart(
+      2,
+      "0"
+    );
+
     const newStat: NewMatchStat = {
       matchId: match.id,
       matchTitle,
@@ -364,9 +380,11 @@ export function MatchForm({
       teamId: newStatForm.teamId,
       teamName: newStatForm.teamName,
       type: newStatForm.type,
-      minute: newStatForm.minute,
+      minute: formattedMinute,
       home: newStatForm.home,
     };
+
+    console.log("Adding new stat:", newStat);
 
     addStatMutation.mutate(newStat, {
       onSuccess: () => {
@@ -922,7 +940,7 @@ export function MatchForm({
                               }));
                             }}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full">
                               <SelectValue placeholder='Select team' />
                             </SelectTrigger>
                             <SelectContent>
@@ -957,7 +975,7 @@ export function MatchForm({
                               }
                             }}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full">
                               <SelectValue placeholder='Select player' />
                             </SelectTrigger>
                             <SelectContent>
@@ -986,7 +1004,7 @@ export function MatchForm({
                               }))
                             }
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full">
                               <SelectValue placeholder='Select stat type' />
                             </SelectTrigger>
                             <SelectContent>
@@ -1007,12 +1025,36 @@ export function MatchForm({
                             max='120'
                             placeholder='90'
                             value={newStatForm.minute}
-                            onChange={(e) =>
+                            // onChange={(e) =>
+                            //   setNewStatForm((prev) => ({
+                            //     ...prev,
+                            //     minute: e.target.value,
+                            //   }))
+                            // }
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              // Format to double digits when the user finishes typing
+                              const formattedValue = value
+                                ? String(parseInt(value)).padStart(2, "0")
+                                : "";
                               setNewStatForm((prev) => ({
                                 ...prev,
-                                minute: e.target.value,
-                              }))
-                            }
+                                minute: formattedValue,
+                              }));
+                            }}
+                            onBlur={(e) => {
+                              // Ensure double digit format on blur
+                              const value = e.target.value;
+                              if (value && !isNaN(parseInt(value))) {
+                                const formattedValue = String(
+                                  parseInt(value)
+                                ).padStart(2, "0");
+                                setNewStatForm((prev) => ({
+                                  ...prev,
+                                  minute: formattedValue,
+                                }));
+                              }
+                            }}
                           />
                         </div>
                       </div>
