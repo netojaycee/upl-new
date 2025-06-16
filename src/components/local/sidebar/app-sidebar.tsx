@@ -24,6 +24,7 @@ import {
   ImageIcon,
   LucideIcon,
   Newspaper,
+  UserCog,
 } from "lucide-react";
 
 const data = {
@@ -81,6 +82,11 @@ const data = {
       title: "Referees",
       url: "/referees",
       icon: User,
+    },
+    {
+      title: "User Management",
+      url: "/users",
+      icon: UserCog,
     },
     {
       title: "News",

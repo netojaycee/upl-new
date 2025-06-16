@@ -237,3 +237,54 @@ export interface NewMatchStat {
     minute: string;
     home: boolean;
 }
+
+export interface User {
+    uid: string;
+    email: string;
+    displayName?: string;
+    photoURL?: string;
+    phoneNumber?: string;
+    disabled: boolean;
+    emailVerified: boolean;
+    roles: string[];
+    createdAt: string;
+    lastSignInTime?: string;
+    customClaims?: Record<string, any>;
+}
+
+export interface NewUser {
+    email: string;
+    password: string;
+    displayName?: string;
+    photoURL?: string;
+    phoneNumber?: string;
+    roles: string[];
+    emailVerified?: boolean;
+    disabled?: boolean;
+}
+
+export interface Role {
+    id: string;
+    name: string;
+    description?: string;
+    permissions: string[];
+    createdAt: string;
+    isSystem: boolean; // Whether it's a system role that cannot be deleted
+}
+
+export interface NewRole {
+    name: string;
+    description?: string;
+    permissions: string[];
+    isSystem?: boolean;
+}
+
+export interface UserUpdate {
+    displayName?: string;
+    photoURL?: string;
+    phoneNumber?: string;
+    disabled?: boolean;
+    emailVerified?: boolean;
+    roles?: string[];
+    customClaims?: Record<string, any>;
+}

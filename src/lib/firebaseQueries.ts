@@ -9,7 +9,7 @@ import {
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth"; // Add this import
 import { auth, db } from "./firebase"; // Import auth from firebase.ts
 import { User } from "firebase/auth";
-import { League, LoginCredentials, NewLeague, NewPlayer, NewTeam, Player, Team, Match, MatchStatus, NewMatch, BulkMatchUpload, Venue, NewVenue, Referee, NewReferee, Carousel, NewCarousel, Settings, News, NewNews, MatchStat, NewMatchStat } from "./types";
+import { League, LoginCredentials, NewLeague, NewPlayer, NewTeam, Player, Team, Match, MatchStatus, NewMatch, BulkMatchUpload, Venue, NewVenue, Referee, NewReferee, Carousel, NewCarousel, Settings, News, NewNews, MatchStat, NewMatchStat, User as AppUser, NewUser, UserUpdate, Role, NewRole } from "./types";
 import useAuthStore from "./store";
 import {
     collection,
@@ -46,26 +46,26 @@ export const useLogin = (): UseMutationResult<
 };
 
 
-const fetchUser = (): Promise<User | null> => {
-    return new Promise((resolve, reject) => {
-        const unsubscribe = onAuthStateChanged(
-            auth,
-            (user) => {
-                resolve(user);
-                unsubscribe(); // unsubscribe after first call
-            },
-            (error) => reject(error)
-        );
-    });
-};
+// const fetchUser = (): Promise<User | null> => {
+//     return new Promise((resolve, reject) => {
+//         const unsubscribe = onAuthStateChanged(
+//             auth,
+//             (user) => {
+//                 resolve(user);
+//                 unsubscribe(); // unsubscribe after first call
+//             },
+//             (error) => reject(error)
+//         );
+//     });
+// };
 
-export const useUser = () => {
-    return useQuery({
-        queryKey: ["user"],
-        queryFn: fetchUser,
-        // optional: set stale time, refetch interval etc.
-    });
-};
+// export const useUser = () => {
+//     return useQuery({
+//         queryKey: ["user"],
+//         queryFn: fetchUser,
+//         // optional: set stale time, refetch interval etc.
+//     });
+// };
 
 // Mutation to handle logout
 export const useLogout = () => {
@@ -1724,6 +1724,212 @@ export const useDeleteMatchStat = () => {
         },
         onSuccess: (matchId) => {
             queryClient.invalidateQueries({ queryKey: ["matchStats", matchId] });
+        },
+    });
+};
+
+// User Management Queries
+export const useUsers = (): UseQueryResult<AppUser[], Error> => {
+    return useQuery({
+        queryKey: ["users"],
+        queryFn: async () => {
+            const response = await fetch("/api/users");
+            if (!response.ok) {
+                throw new Error("Failed to fetch users");
+            }
+            return response.json();
+        },
+    });
+};
+
+export const useUser = (uid: string): UseQueryResult<AppUser, Error> => {
+    return useQuery({
+        queryKey: ["user", uid],
+        queryFn: async () => {
+            const response = await fetch(`/api/users/${uid}`);
+            if (!response.ok) {
+                throw new Error("Failed to fetch user");
+            }
+            return response.json();
+        },
+        enabled: !!uid,
+    });
+};
+
+export const useCreateUser = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (userData: NewUser) => {
+            const response = await fetch("/api/users", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(userData),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || "Failed to create user");
+            }
+
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["users"] });
+        },
+    });
+};
+
+export const useUpdateUser = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ uid, userData }: { uid: string; userData: UserUpdate }) => {
+            const response = await fetch(`/api/users/${uid}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(userData),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || "Failed to update user");
+            }
+
+            return response.json();
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["users"] });
+            queryClient.invalidateQueries({ queryKey: ["user", data.uid] });
+        },
+    });
+};
+
+export const useDeleteUser = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (uid: string) => {
+            const response = await fetch(`/api/users/${uid}`, {
+                method: "DELETE",
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || "Failed to delete user");
+            }
+
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["users"] });
+        },
+    });
+};
+
+// Role Management Queries
+export const useRoles = (): UseQueryResult<Role[], Error> => {
+    return useQuery({
+        queryKey: ["roles"],
+        queryFn: async () => {
+            const response = await fetch("/api/roles");
+            if (!response.ok) {
+                throw new Error("Failed to fetch roles");
+            }
+            return response.json();
+        },
+    });
+};
+
+export const useRole = (id: string): UseQueryResult<Role, Error> => {
+    return useQuery({
+        queryKey: ["role", id],
+        queryFn: async () => {
+            const response = await fetch(`/api/roles/${id}`);
+            if (!response.ok) {
+                throw new Error("Failed to fetch role");
+            }
+            return response.json();
+        },
+        enabled: !!id,
+    });
+};
+
+export const useCreateRole = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (roleData: NewRole) => {
+            const response = await fetch("/api/roles", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(roleData),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || "Failed to create role");
+            }
+
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["roles"] });
+        },
+    });
+};
+
+export const useUpdateRole = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, roleData }: { id: string; roleData: Partial<Role> }) => {
+            const response = await fetch(`/api/roles/${id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(roleData),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || "Failed to update role");
+            }
+
+            return response.json();
+        },
+        onSuccess: (data) => {
+            queryClient.invalidateQueries({ queryKey: ["roles"] });
+            queryClient.invalidateQueries({ queryKey: ["role", data.id] });
+        },
+    });
+};
+
+export const useDeleteRole = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (id: string) => {
+            const response = await fetch(`/api/roles/${id}`, {
+                method: "DELETE",
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || "Failed to delete role");
+            }
+
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["roles"] });
         },
     });
 };
