@@ -237,3 +237,62 @@ export interface NewMatchStat {
     minute: string;
     home: boolean;
 }
+
+// User and Role Management Types
+export interface User {
+    uid: string;
+    email: string;
+    displayName?: string;
+    photoURL?: string;
+    disabled: boolean;
+    emailVerified: boolean;
+    roles: string[];
+    createdAt: string;
+    lastSignIn?: string;
+    phoneNumber?: string;
+}
+
+export interface NewUser {
+    email: string;
+    password: string;
+    displayName?: string;
+    photoURL?: string;
+    roles: string[];
+    disabled?: boolean;
+    emailVerified?: boolean;
+    phoneNumber?: string;
+    photoFile?: File;
+}
+
+export interface UserUpdate {
+    displayName?: string;
+    photoURL?: string;
+    disabled?: boolean;
+    emailVerified?: boolean;
+    roles?: string[];
+    phoneNumber?: string;
+    photoFile?: File;
+}
+
+export interface Role {
+    id: string;
+    name: string;
+    description?: string;
+    permissions: string[];
+    isSystem: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface NewRole {
+    name: string;
+    description?: string;
+    permissions: string[];
+    isSystem: boolean;
+}
+
+export interface RoleUpdate {
+    name?: string;
+    description?: string;
+    permissions?: string[];
+}

@@ -88,6 +88,11 @@ const data = {
       icon: Newspaper,
     },
     {
+      title: "Users",
+      url: "/users",
+      icon: Users,
+    },
+    {
       title: "Carousel",
       url: "/carousel",
       icon: ImageIcon,

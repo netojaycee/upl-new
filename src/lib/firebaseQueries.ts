@@ -8,8 +8,8 @@ import {
 } from "@tanstack/react-query";
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth"; // Add this import
 import { auth, db } from "./firebase"; // Import auth from firebase.ts
-import { User } from "firebase/auth";
-import { League, LoginCredentials, NewLeague, NewPlayer, NewTeam, Player, Team, Match, MatchStatus, NewMatch, BulkMatchUpload, Venue, NewVenue, Referee, NewReferee, Carousel, NewCarousel, Settings, News, NewNews, MatchStat, NewMatchStat } from "./types";
+import { User as FirebaseUser } from "firebase/auth";
+import { League, LoginCredentials, NewLeague, NewPlayer, NewTeam, Player, Team, Match, MatchStatus, NewMatch, BulkMatchUpload, Venue, NewVenue, Referee, NewReferee, Carousel, NewCarousel, Settings, News, NewNews, MatchStat, NewMatchStat, Role, NewRole, RoleUpdate, User, NewUser, UserUpdate } from "./types";
 import useAuthStore from "./store";
 import {
     collection,
@@ -46,7 +46,7 @@ export const useLogin = (): UseMutationResult<
 };
 
 
-const fetchUser = (): Promise<User | null> => {
+const fetchUser = (): Promise<FirebaseUser | null> => {
     return new Promise((resolve, reject) => {
         const unsubscribe = onAuthStateChanged(
             auth,
@@ -59,9 +59,9 @@ const fetchUser = (): Promise<User | null> => {
     });
 };
 
-export const useUser = () => {
+export const useCurrentUser = () => {
     return useQuery({
-        queryKey: ["user"],
+        queryKey: ["currentUser"],
         queryFn: fetchUser,
         // optional: set stale time, refetch interval etc.
     });
@@ -1724,6 +1724,329 @@ export const useDeleteMatchStat = () => {
         },
         onSuccess: (matchId) => {
             queryClient.invalidateQueries({ queryKey: ["matchStats", matchId] });
+        },
+    });
+};
+
+// Role management
+export const useRoles = (): UseQueryResult<Role[], Error> => {
+    return useQuery({
+        queryKey: ["roles"],
+        queryFn: async () => {
+            const response = await fetch("/api/roles");
+            if (!response.ok) {
+                throw new Error("Failed to fetch roles");
+            }
+            return response.json();
+        },
+    });
+};
+
+export const useRole = (roleId: string): UseQueryResult<Role | null, Error> => {
+    return useQuery({
+        queryKey: ["role", roleId],
+        queryFn: async () => {
+            if (!roleId) return null;
+            const response = await fetch(`/api/roles/${roleId}`);
+            if (!response.ok) {
+                throw new Error("Failed to fetch role");
+            }
+            return response.json();
+        },
+        enabled: !!roleId,
+    });
+};
+
+export const useCreateRole = (): UseMutationResult<
+    Role,
+    Error,
+    NewRole,
+    unknown
+> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (roleData: NewRole) => {
+            const response = await fetch("/api/roles", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(roleData),
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || "Failed to create role");
+            }
+            return response.json();
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["roles"] });
+        },
+    });
+};
+
+export const useUpdateRole = (): UseMutationResult<
+    Role,
+    Error,
+    { id: string; roleData: RoleUpdate },
+    unknown
+> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async ({ id, roleData }) => {
+            const response = await fetch(`/api/roles/${id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(roleData),
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || "Failed to update role");
+            }
+            return response.json();
+        },
+        onSuccess: (_, { id }) => {
+            queryClient.invalidateQueries({ queryKey: ["roles"] });
+            queryClient.invalidateQueries({ queryKey: ["role", id] });
+        },
+    });
+};
+
+export const useDeleteRole = (): UseMutationResult<
+    void,
+    Error,
+    string,
+    unknown
+> => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: async (roleId: string) => {
+            const response = await fetch(`/api/roles/${roleId}`, {
+                method: "DELETE",
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || "Failed to delete role");
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["roles"] });
+        },
+    });
+};
+
+// User Management Hooks
+export const useUsers = (): UseQueryResult<User[], Error> => {
+    return useQuery({
+        queryKey: ["users"],
+        queryFn: async () => {
+            const response = await fetch("/api/users");
+            if (!response.ok) {
+                throw new Error("Failed to fetch users");
+            }
+            return response.json();
+        },
+    });
+};
+
+export const useUserById = (userId: string): UseQueryResult<User | null, Error> => {
+    return useQuery({
+        queryKey: ["user", userId],
+        queryFn: async () => {
+            if (!userId) return null;
+            const response = await fetch(`/api/users/${userId}`);
+            if (!response.ok) {
+                throw new Error("Failed to fetch user");
+            }
+            return response.json();
+        },
+        enabled: !!userId,
+    });
+};
+
+export const useCreateUser = (): UseMutationResult<
+    User,
+    Error,
+    NewUser,
+    unknown
+> => {
+    const queryClient = useQueryClient();
+    const storage = getStorage();
+
+    return useMutation({
+        mutationFn: async (userData: NewUser) => {
+            let photoURL = userData.photoURL || "";
+
+            // If there's a photo file, upload it first to get the URL
+            if (userData.photoFile) {
+                // Generate a temporary ID for the storage reference since we don't have UID yet
+                const tempId = crypto.randomUUID();
+                const storageRef = ref(storage, `userPhotos/temp_${tempId}.jpg`);
+                await uploadBytes(storageRef, userData.photoFile);
+                photoURL = await getDownloadURL(storageRef);
+            }
+
+            // Send user data with the photo URL to create user
+            const userDataToSend = {
+                ...userData,
+                photoURL,
+                photoFile: undefined, // Remove file from payload for API call
+            };
+
+            const response = await fetch("/api/users", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(userDataToSend),
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || "Failed to create user");
+            }
+
+            const newUser = await response.json();
+
+            // If we uploaded with a temp name, rename it to use the actual UID
+            if (userData.photoFile && newUser.uid && photoURL) {
+                try {
+                    // Upload again with proper UID
+                    const finalStorageRef = ref(storage, `userPhotos/${newUser.uid}.jpg`);
+                    await uploadBytes(finalStorageRef, userData.photoFile);
+                    const finalPhotoURL = await getDownloadURL(finalStorageRef);
+
+                    // Delete the temp file
+                    const tempStorageRef = ref(storage, photoURL);
+                    await deleteObject(tempStorageRef);
+
+                    // Update user with final URL
+                    const updateResponse = await fetch(`/api/users/${newUser.uid}`, {
+                        method: "PUT",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ photoURL: finalPhotoURL }),
+                    });
+
+                    if (updateResponse.ok) {
+                        return await updateResponse.json();
+                    }
+                } catch (error) {
+                    console.error("Error updating photo with final UID:", error);
+                }
+            }
+
+            return newUser;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["users"] });
+        },
+    });
+};
+
+export const useUpdateUser = (): UseMutationResult<
+    User,
+    Error,
+    { uid: string; userData: UserUpdate },
+    unknown
+> => {
+    const queryClient = useQueryClient();
+    const storage = getStorage();
+
+    return useMutation({
+        mutationFn: async ({ uid, userData }) => {
+            let photoURL = userData.photoURL;            // If there's a new photo file, upload it
+            if (userData.photoFile) {
+                // Delete the old photo if it exists
+                if (userData.photoURL && userData.photoURL.includes('userPhotos/')) {
+                    try {
+                        // Use the standard path for user photos
+                        const oldImageRef = ref(storage, `userPhotos/${uid}.jpg`);
+                        await deleteObject(oldImageRef);
+                    } catch (error) {
+                        console.log("Error deleting old photo:", error);
+                    }
+                }
+
+                // Upload new photo
+                const storageRef = ref(storage, `userPhotos/${uid}.jpg`);
+                await uploadBytes(storageRef, userData.photoFile);
+                photoURL = await getDownloadURL(storageRef);
+            }
+
+            const userDataToSend = {
+                ...userData,
+                photoURL,
+                photoFile: undefined, // Remove file from payload
+            };
+
+            const response = await fetch(`/api/users/${uid}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(userDataToSend),
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || "Failed to update user");
+            }
+            return response.json();
+        },
+        onSuccess: (_, { uid }) => {
+            queryClient.invalidateQueries({ queryKey: ["users"] });
+            queryClient.invalidateQueries({ queryKey: ["user", uid] });
+        },
+    });
+};
+
+export const useDeleteUser = (): UseMutationResult<
+    void,
+    Error,
+    string,
+    unknown
+> => {
+    const queryClient = useQueryClient();
+    const storage = getStorage();
+
+    return useMutation({
+        mutationFn: async (userId: string) => {
+            // First get user data to check for images
+            try {
+                const userResponse = await fetch(`/api/users/${userId}`);
+                if (userResponse.ok) {
+                    const userData = await userResponse.json();
+
+                    // Delete user photo from storage if it exists
+                    if (userData.photoURL && userData.photoURL.includes('userPhotos/')) {
+                        try {
+                            const imageRef = ref(storage, `userPhotos/${userId}.jpg`);
+                            await deleteObject(imageRef);
+                        } catch (storageError) {
+                            console.log("Error deleting user photo from storage:", storageError);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.log("Error fetching user data before deletion:", error);
+            }
+
+            // Delete the user
+            const response = await fetch(`/api/users/${userId}`, {
+                method: "DELETE",
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.message || "Failed to delete user");
+            }
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["users"] });
         },
     });
 };

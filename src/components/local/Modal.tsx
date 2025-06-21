@@ -25,7 +25,7 @@ export function Modal({
 }: ModalProps) {
   return (
     <Dialog open={isOpen}  onOpenChange={onClose}>
-      <DialogContent   className={`p-4 overflow-y-auto ${className}`}>
+      <DialogContent   className={`p-4 overflow-y-auto ${className} max-h-[80vh] sm:max-w-[650px]`}>
         <DialogHeader>
           <DialogTitle className="fixed top-0">
             {title && (
@@ -36,7 +36,7 @@ export function Modal({
           </DialogTitle>
         
         </DialogHeader>
-        <div>{children}</div>
+        <div className="mt-5">{children}</div>
       </DialogContent>
     </Dialog>
   );

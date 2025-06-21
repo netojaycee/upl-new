@@ -42,12 +42,11 @@ export default function Main({ id }: { id: string }) {
 
   useEffect(() => {
     if (league) {
-      // eslint-disable-next-line
       setData({
         leagueName: `${league.competition} ${league.year}`,
       });
     }
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [league]);
 
   console.log(leagueTeams, "jjj");
